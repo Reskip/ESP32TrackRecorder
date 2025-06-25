@@ -1,6 +1,7 @@
 #include "status/gnss_state.h"
 #include "status/battery_state.h"
 #include "status/encoder_state.h"
+#include "status/trace_state.h"
 
 #ifndef CONTEXT
 #define CONTEXT
@@ -9,10 +10,12 @@ struct Context {
     Context(
         GNSSState& gnss_state,
         Battery& battery_state,
-        Encoder& encoder_state):
+        Encoder& encoder_state,
+        Trace& trace_state):
         gnss_state(gnss_state),
         battery_state(battery_state),
         encoder_state(encoder_state),
+        trace_state(trace_state),
         select_page_id(2),
         last_fresh_ts_ms(0),
         fresh_ts_diff_ms(0),
@@ -27,6 +30,7 @@ struct Context {
     GNSSState& gnss_state;
     Battery& battery_state;
     Encoder& encoder_state;
+    Trace& trace_state;
     int select_page_id;
     int64_t last_fresh_ts_ms;
     int64_t fresh_ts_diff_ms;

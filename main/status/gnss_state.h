@@ -1,7 +1,5 @@
 #include <string>
 #include <vector>
-#include <cmath>
-#include <utility>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -20,6 +18,7 @@
 #define UART_NUM UART_NUM_1
 #define BUF_SIZE 2048
 #define ACK_ROUND 10
+#define POINT_CACHE_SIZE 5
 
 #define UBX_SYNC_CHAR_1 0xB5
 #define UBX_SYNC_CHAR_2 0x62
@@ -68,7 +67,6 @@ public:
     bool init();
     bool send_ubx_command(const uint8_t* command, size_t length);
     bool wait_for_ack(uint8_t class_id, uint8_t msg_id);
-    double haversine_distance(double lat1, double lon1, double lat2, double lon2);
 
     gpio_num_t gpio_tx;
     gpio_num_t gpio_rx;
@@ -90,6 +88,7 @@ public:
     SemaphoreHandle_t mutex;
     std::string timestamp;
     std::vector<Satellite> satellites;
+    std::vector<std::pair<double, double>> point_cache;
 };
 
 #endif

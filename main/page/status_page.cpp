@@ -15,6 +15,9 @@ StatusPage::StatusPage()
 void StatusPage::render_expand(Context &context, OLED &oled) {
     int start_x = std::round(get_sidebar_start_pos_x());
     float battery = context.battery_state.read_soc();
+    if (battery > 100) {
+        battery = 100.0;
+    }
     while (xSemaphoreTake(context.storage_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
     double flash_use_rate = (context.flash_used * 100.0) / context.flash_total;
     double ram_use_rate = (context.ram_used * 100.0) / context.ram_total;

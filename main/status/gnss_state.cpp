@@ -5,6 +5,7 @@
 #include "esp_log.h"
 
 #include "status/gnss_state.h"
+#include "utils/utils.h"
 
 GNSSState::GNSSState(gpio_num_t tx, gpio_num_t rx)
     :
@@ -105,7 +106,7 @@ bool GNSSState::parse() {
     int _fix_quality;
     int _fix_type;
     bool _valid;
-    int _hour, _minute, _second, _microseconds;
+    int _year, _month, _day, _hour, _minute, _second, _microseconds;
     bool update_rmc = false;
     bool update_gga = false;
     bool update_gst = false;
@@ -125,16 +126,24 @@ bool GNSSState::parse() {
 
             switch (minmea_sentence_id(line.c_str(), false)) {
                 case MINMEA_SENTENCE_RMC: {
+                    std::cout << line << "\n";
                     if (minmea_parse_rmc(&rmc, line.c_str())) {
                         _latitude = minmea_tocoord(&rmc.latitude);
                         _longitude = minmea_tocoord(&rmc.longitude);
                         _doppler_speed = minmea_tofloat(&rmc.speed);
+                        _year = rmc.date.year;
+                        _month = rmc.date.month;
+                        _day = rmc.date.day;
                         _hour = rmc.time.hours;
                         _minute = rmc.time.minutes;
                         _second = rmc.time.seconds;
                         _microseconds = rmc.time.microseconds;
                         _valid = rmc.valid;
-                        if (_hour < 0 || _minute < 0 || _second < 0) {
+                        if (_year < 0 || _month < 0 || _day < 0 ||\
+                            _hour < 0 || _minute < 0 || _second < 0) {
+                            _year = 0;
+                            _month = 0;
+                            _day = 0;
                             _hour = 0;
                             _minute = 0;
                             _second = 0;
@@ -267,15 +276,30 @@ bool GNSSState::parse() {
         if (valid && _valid) {
             double ts_before = hour + (minute / 60.0) + (second / 3600.0) + (microseconds / 3.6e9);
             double ts_now = _hour + (_minute / 60.0) + (_second / 3600.0) + (_microseconds / 3.6e9);
-            std::cout << "time diff: " << ts_before << " " << ts_now << " " << _minute << " " << _second << " " << microseconds << "\n";
-            if (ts_now - ts_before > 0) {
-                ground_speed = haversine_distance(latitude, longitude, _latitude, _longitude) / (ts_now - ts_before);
-            }
+            double ts_diff = ts_now - ts_before;
+            double distance = haversine_distance(latitude, longitude, _latitude, _longitude);
+            point_cache.push_back(std::make_pair(ts_diff, distance));
+        } else if (!point_cache.empty()) {
+            point_cache.erase(point_cache.begin());
         }
+        while (point_cache.size() > POINT_CACHE_SIZE) {
+            point_cache.erase(point_cache.begin());
+        }
+        double ts_diff_sum = 1e-10;
+        double distance_sum = 0.0;
+        for (auto &it: point_cache) {
+            ts_diff_sum += it.first;
+            distance_sum += it.second;
+        }
+        ground_speed = distance_sum / ts_diff_sum;
+
         latitude = _latitude;
         longitude = _longitude;
         doppler_speed = _doppler_speed;
         valid = _valid;
+        year = _year;
+        month = _month;
+        day = _day;
         hour = _hour;
         minute = _minute;
         second = _second;
@@ -332,27 +356,4 @@ bool GNSSState::wait_for_ack(uint8_t class_id, uint8_t msg_id) {
 
     ESP_LOGE(GNSS_TAG, "Timeout waiting for UBX ACK");
     return false;
-}
-
-double GNSSState::haversine_distance(double lat1, double lon1, double lat2, double lon2) {
-    const double R = 6371.0;
-
-    auto to_radians = [](double degrees) {
-        return degrees * M_PI / 180.0;
-    };
-
-    lat1 = to_radians(lat1);
-    lon1 = to_radians(lon1);
-    lat2 = to_radians(lat2);
-    lon2 = to_radians(lon2);
-
-    double dLat = lat2 - lat1;
-    double dLon = lon2 - lon1;
-
-    double a = std::sin(dLat/2) * std::sin(dLat/2) +
-               std::cos(lat1) * std::cos(lat2) *
-               std::sin(dLon/2) * std::sin(dLon/2);
-    double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1-a));
-
-    return R * c;
 }

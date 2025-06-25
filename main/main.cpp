@@ -22,6 +22,7 @@
 #include "status/battery_state.h"
 #include "status/gnss_state.h"
 #include "status/encoder_state.h"
+#include "status/trace_state.h"
 
 #define MAIN_TAG "Main"
 #define MOUNT_POINT "/spiflash"
@@ -55,7 +56,6 @@ void monitorSystemResources(Context &context) {
 }
 
 void mount_sdcard_spi() {
-
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_INPUT;
@@ -103,8 +103,9 @@ DisplayManager display(GPIO_NUM_2, GPIO_NUM_1);
 GNSSState gnss_state(GPIO_NUM_21, GPIO_NUM_47);
 Battery battery_state(GPIO_NUM_15, GPIO_NUM_16, GPIO_NUM_5);
 Encoder encoder_state(GPIO_NUM_9, GPIO_NUM_3, GPIO_NUM_46);
+Trace trace_state;
 
-Context context(gnss_state, battery_state, encoder_state);
+Context context(gnss_state, battery_state, encoder_state, trace_state);
 
 extern "C" void app_main() {
     context.start_ts_ms = esp_timer_get_time() / 1000;
@@ -141,5 +142,9 @@ extern "C" void app_main() {
         // gnss_state.print_debug_info();
         // battery_state.print_debug_info();
         display.updateDisplay(context);
+
+        if (context.fresh_cnt == 0 && context.gnss_state.valid) { // every second
+            trace_state.add_waypoint(context.gnss_state);
+        }
     }
 }

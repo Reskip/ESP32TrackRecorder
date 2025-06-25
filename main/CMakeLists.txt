@@ -3,6 +3,7 @@ file(GLOB_RECURSE SOURCES
     "page/*.cpp"
     "status/*.cpp"
     "icon/*.cpp"
+    "utils/*.cpp"
 )
 
 idf_component_register(
