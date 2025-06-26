@@ -29,24 +29,25 @@ public:
 
     void render(Context& context, OLED& oled) override;
     void switch_state();
+    virtual bool handle_press(Context& context, OLED &oled);
+    virtual bool handle_scroll(Context& context, OLED &oled, int value);
 
     void set_init_position(int index, int item_num);
     void set_target_position(int index, int item_num);
     double get_sidebar_start_pos_x();
+    void smooth_easing_move(double &current, double target, double &progress, double speed, bool update_progress=true);
+    double lock_fps_speed(Context &context, double speed);
     void debug();
 
 private:
     virtual void render_expand(Context &context, OLED &oled) = 0;
     void render_icon(Context &context, OLED &oled);
-    double lock_fps_speed(Context &context, double speed);
     double index_to_position(int index, int item_num);
     double ease_out_quad(double progress);
-    void smooth_easing_move(double &current, double target, double &progress, double speed);
 
     double sidebar_current_position;
     double sidebar_target_position;
     double sidebar_progress;
-    double sidebar_speed_delta;
 
     double expand_current_position;
     double expand_target_position;

@@ -143,7 +143,7 @@ extern "C" void app_main() {
         // battery_state.print_debug_info();
         display.updateDisplay(context);
 
-        if (context.fresh_cnt == 0 && context.gnss_state.valid) { // every second
+        if (context.enable_track && context.fresh_cnt == 0 && context.gnss_state.valid) { // every second
             trace_state.add_waypoint(context.gnss_state);
         }
     }

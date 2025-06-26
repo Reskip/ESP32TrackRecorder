@@ -17,6 +17,10 @@ struct Context {
         encoder_state(encoder_state),
         trace_state(trace_state),
         select_page_id(2),
+        select_btn_id(0),
+        brightness(0),
+        enable_wifi(false),
+        enable_track(false),
         last_fresh_ts_ms(0),
         fresh_ts_diff_ms(0),
         last_fps_update_ts_ms(0),
@@ -25,13 +29,19 @@ struct Context {
         flash_total(0),
         flash_used(0),
         ram_total(0),
-        ram_used(0) {
+        ram_used(0),
+        statue_change_flag(false) {
         }
     GNSSState& gnss_state;
     Battery& battery_state;
     Encoder& encoder_state;
     Trace& trace_state;
     int select_page_id;
+    int select_btn_id;
+    int brightness;
+    bool enable_wifi;
+    bool enable_track;
+
     int64_t last_fresh_ts_ms;
     int64_t fresh_ts_diff_ms;
     int64_t last_fps_update_ts_ms;
@@ -43,6 +53,8 @@ struct Context {
     int64_t flash_used;
     int64_t ram_total;
     int64_t ram_used;
+
+    bool statue_change_flag;
 
     SemaphoreHandle_t storage_mutex = xSemaphoreCreateMutex();;
 };

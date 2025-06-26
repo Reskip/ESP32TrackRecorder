@@ -32,6 +32,14 @@ void SidebarPage::switch_state() {
     }
 }
 
+bool SidebarPage::handle_press(Context& context, OLED &oled) {
+    return false;
+}
+
+bool SidebarPage::handle_scroll(Context& context, OLED &oled, int value) {
+    return false;
+}
+
 void SidebarPage::set_init_position(int index, int item_num) {
     sidebar_progress = 1.0;
     expand_progress = 1.0;
@@ -99,11 +107,13 @@ double SidebarPage::ease_out_quad(double progress) {
     return 1.0 - (1.0 - progress) * (1.0 - progress);
 }
 
-void SidebarPage::smooth_easing_move(double &current, double target, double &progress, double speed) {
+void SidebarPage::smooth_easing_move(double &current, double target, double &progress, double speed, bool update_progress) {
     if (progress >= 1.0) {
         return;
     }
-    progress = std::min(1.0, progress + speed);
+    if (update_progress) {
+        progress = std::min(1.0, progress + speed);
+    }
     double eased_progress = ease_out_quad(progress);
     current = current + (target - current) * eased_progress;
 }

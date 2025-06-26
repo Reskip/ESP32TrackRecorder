@@ -12,7 +12,6 @@
 #define WIDTH 128
 #define HEIGHT 32
 #define FPS 60
-#define FRAME_MS (1000.0 / FPS)
 
 enum PageState {
     NORMAL,

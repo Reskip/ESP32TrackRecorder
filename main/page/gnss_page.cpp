@@ -24,13 +24,13 @@ void GNSSPage::render_expand(Context &context, OLED &oled) {
         lat_stream << std::fixed << std::setprecision(6) << context.gnss_state.latitude;
         lon_stream << std::fixed << std::setprecision(6) << context.gnss_state.longitude;
     } else {
-        lat_stream << "UNAVILIABLE";
-        lon_stream << "UNAVILIABLE";
+        lat_stream << "---";
+        lon_stream << "---";
     }
     if (context.gnss_state.fix_quality > 0) {
         alt_stream << std::fixed << std::setprecision(6) << context.gnss_state.altitude;
     } else {
-        alt_stream << "UNAVILIABLE";
+        alt_stream << "---";
     }
 
     oled.draw_string(start_x + X_MARGIN, 0, lon_stream.str().c_str(), WHITE, BLACK);

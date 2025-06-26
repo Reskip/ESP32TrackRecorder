@@ -55,10 +55,26 @@ void DisplayManager::updateDisplay(Context &context) {
     }
 
     encoder_event_t event;
+    while (xQueueReceive(context.encoder_state.press_queue, &event, 0)){
+        if (!event.position) {
+            continue;
+        }
+        if (side_pages[context.select_page_id]->handle_press(context, oled)) {
+            continue;
+        }
+        side_pages[context.select_page_id]->switch_state();
+        ESP_LOGI(DISPLAY_TAG, "Encoder Event: %d, switch state", event.position);
+    }
+
     while (xQueueReceive(context.encoder_state.encoder_queue, &event, 0)){
+        if (side_pages[context.select_page_id]->handle_scroll(context, oled, event.position)) {
+            continue;
+        }
+
         if (side_pages[context.select_page_id]->get_state() == PageState::EXPANDED) {
             continue;
         }
+
         if (event.position) {
             context.select_page_id += event.position + side_pages.size();
             context.select_page_id %= side_pages.size();
@@ -73,14 +89,6 @@ void DisplayManager::updateDisplay(Context &context) {
             }
         }
         ESP_LOGI(DISPLAY_TAG, "Encoder Event: %d, select page: %d", event.position, context.select_page_id);
-    }
-
-    while (xQueueReceive(context.encoder_state.press_queue, &event, 0)){
-        if (!event.position) {
-            continue;
-        }
-        side_pages[context.select_page_id]->switch_state();
-        ESP_LOGI(DISPLAY_TAG, "Encoder Event: %d, switch state", event.position);
     }
 
     oled.clear();
