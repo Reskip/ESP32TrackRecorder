@@ -126,7 +126,7 @@ bool GNSSState::parse() {
 
             switch (minmea_sentence_id(line.c_str(), false)) {
                 case MINMEA_SENTENCE_RMC: {
-                    std::cout << line << "\n";
+                    // std::cout << line << "\n";
                     if (minmea_parse_rmc(&rmc, line.c_str())) {
                         _latitude = minmea_tocoord(&rmc.latitude);
                         _longitude = minmea_tocoord(&rmc.longitude);

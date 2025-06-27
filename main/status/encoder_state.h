@@ -8,7 +8,7 @@
 #define ENCODERSTATE
 
 #define ENCODER_TAG "EncoderState"
-#define DEBOUNCE_SAME_TIME_MS 50
+#define DEBOUNCE_SAME_TIME_MS 80
 #define DEBOUNCE_SWITCH_TIME_MS 200
 
 typedef struct {

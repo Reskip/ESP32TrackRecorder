@@ -25,3 +25,23 @@ double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
 
     return R * c;
 }
+
+void init_gpx(FILE *fp) {
+    const char* header = R"(<?xml version="1.0" encoding="utf-8"?>
+<gpx version="1.1" creator="Guru Maps/5.7.4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gom="https://gurumaps.app/gpx/v3">
+    <trk>
+        <name>TRACK_FILE</name>
+        <type>TrackStyle_1000000</type>
+        <trkseg>
+)";
+    fprintf(fp, header);
+}
+
+void close_gpx(FILE *fp) {
+    const char* header = R"(        </trkseg>
+    </trk>
+</gpx>
+)";
+    fprintf(fp, header);
+    fclose(fp);
+}

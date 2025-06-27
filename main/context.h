@@ -56,6 +56,10 @@ struct Context {
 
     bool statue_change_flag;
 
+    int timezone;
+    std::string wifi_ssid;
+    std::string wifi_passwd;
+
     SemaphoreHandle_t storage_mutex = xSemaphoreCreateMutex();;
 };
 

@@ -27,7 +27,8 @@ void MainPage::render_normal(Context &context, OLED &oled) {
     oled.draw_bitmap(0, 0, (const uint8_t*) battery_icon[get_battery_level(battery)], 13, 7);
 
     std::ostringstream timeBatteryStream;
-    timeBatteryStream << (context.gnss_state.hour < 10 ? "0" : "") << context.gnss_state.hour << ":"
+    int hour = (context.gnss_state.hour + context.timezone + 24) % 24;
+    timeBatteryStream << (hour < 10 ? "0" : "") << hour << ":"
                       << (context.gnss_state.minute < 10 ? "0" : "") << context.gnss_state.minute;
     oled.draw_string(60, 0, timeBatteryStream.str().c_str(), WHITE, BLACK);
 

@@ -3,6 +3,8 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <filesystem>
+#include <fstream>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,6 +15,10 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_event.h"
+#include "esp_wifi.h"
+#include "esp_http_server.h"
+#include "lwip/ip4_addr.h"
 #include "sdmmc_cmd.h"
 
 #include "minmea.h"
@@ -26,6 +32,57 @@
 
 #define MAIN_TAG "Main"
 #define MOUNT_POINT "/spiflash"
+#define CONFIG_FILE "CONFIG.TXT"
+
+void load_config(Context &context) {
+    std::string conf_file_path = std::string(MOUNT_POINT) + "/" + CONFIG_FILE;
+
+    if (!std::filesystem::exists(conf_file_path)) {
+        std::cout << "Config file not found. Creating with default values..." << std::endl;
+
+        std::ofstream file(conf_file_path);
+        if (!file.is_open()) {
+            std::cerr << "Error: Cannot create config file!" << std::endl;
+            return;
+        }
+        
+        context.timezone = 8;
+        context.wifi_ssid = "";
+        context.wifi_passwd = "";
+        file << "timezone=" << context.timezone << "\n";
+        file << "wifi_ssid=" << context.wifi_ssid << "\n";
+        file << "wifi_passwd=" << context.wifi_passwd << "\n";
+        file.close();
+        return;
+    }
+
+    std::ifstream file(conf_file_path);
+    if (!file.is_open()) {
+        std::cerr << "Error: Cannot open config file!" << std::endl;
+        return;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.empty()) continue;
+        
+        size_t pos = line.find('=');
+        if (pos == std::string::npos) continue;
+
+        std::string key = line.substr(0, pos);
+        std::string value = line.substr(pos + 1);
+        
+        if (key == "timezone") {
+            context.timezone = std::stoi(value);
+        } else if (key == "wifi_ssid") {
+            context.wifi_ssid = value;
+        } else if (key == "wifi_passwd") {
+            context.wifi_passwd = value;
+        }
+    }
+
+    file.close();
+    return;
+}
 
 void monitorSystemResources(Context &context) {
     UBaseType_t stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
@@ -41,10 +98,10 @@ void monitorSystemResources(Context &context) {
     uint64_t total_bytes, free_bytes;
     esp_err_t err = esp_vfs_fat_info(MOUNT_POINT, &total_bytes, &free_bytes);
     if (err == ESP_OK) {
-        ESP_LOGI("FATFS", "Total size: %llu bytes", total_bytes);
-        ESP_LOGI("FATFS", "Free space: %llu bytes", free_bytes);
+        ESP_LOGI(MAIN_TAG, "Total size: %llu bytes", total_bytes);
+        ESP_LOGI(MAIN_TAG, "Free space: %llu bytes", free_bytes);
     } else {
-        ESP_LOGE("Main", "Failed to get file system info: %s", esp_err_to_name(err));
+        ESP_LOGE(MAIN_TAG, "Failed to get file system info: %s", esp_err_to_name(err));
     }
 
     while (xSemaphoreTake(context.storage_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
@@ -95,8 +152,8 @@ void mount_sdcard_spi() {
 		.allocation_unit_size=16*1024,
 	};
 
-	esp_vfs_fat_sdspi_mount(MOUNT_POINT,&host,&slot_cnf,&mount_cnf,&card);
-	sdmmc_card_print_info(stdout,card);
+	esp_vfs_fat_sdspi_mount(MOUNT_POINT, &host, &slot_cnf, &mount_cnf, &card);
+	sdmmc_card_print_info(stdout, card);
 }
 
 DisplayManager display(GPIO_NUM_2, GPIO_NUM_1);
@@ -110,6 +167,7 @@ Context context(gnss_state, battery_state, encoder_state, trace_state);
 extern "C" void app_main() {
     context.start_ts_ms = esp_timer_get_time() / 1000;
     mount_sdcard_spi();
+    load_config(context);
 
     gpio_reset_pin(GPIO_NUM_4);
     gpio_set_direction(GPIO_NUM_4, GPIO_MODE_OUTPUT);
@@ -133,7 +191,7 @@ extern "C" void app_main() {
     }, "UpdateGNSSState", 4096, NULL, 1, NULL);
 
     if (!display.init()) {
-        ESP_LOGE("OLED", "Failed to initialize OLED");
+        ESP_LOGE(MAIN_TAG, "Failed to initialize OLED");
         return;
     }
 
@@ -145,6 +203,9 @@ extern "C" void app_main() {
 
         if (context.enable_track && context.fresh_cnt == 0 && context.gnss_state.valid) { // every second
             trace_state.add_waypoint(context.gnss_state);
+        }
+        if (!context.enable_track) {
+            trace_state.try_close_trace();
         }
     }
 }

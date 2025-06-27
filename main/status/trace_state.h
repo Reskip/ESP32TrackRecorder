@@ -9,6 +9,7 @@
 #define TRACESTATE
 
 #define TRACE_TAG "TraceState"
+#define MOUNT_POINT "/spiflash"
 
 struct WayPoint {
     double latitude;
@@ -31,7 +32,12 @@ struct WayPoint {
 
 class Trace {
 public:
-    Trace() = default;
+    Trace() {
+        distance = 0.0;
+        sample_cnt = 0;
+        local_start_time_ms = 0;
+        fp = nullptr;
+    };
     ~Trace() = default;
 
     void add_waypoint(GNSSState &gnss_state);
@@ -45,16 +51,23 @@ public:
     }
 
     int get_waypoint_size() const {
-        return current_trace.size();
+        return sample_cnt;
     }
 
     const std::vector<WayPoint>& get_waypoints() const {
         return current_trace;
     }
 
+    void try_close_trace();
+
+    int get_duration_ms();
+
 private:
     std::vector<WayPoint> current_trace;
-    std::optional<std::chrono::system_clock::time_point> start_time;
-    double distance = 0.0;
+    std::chrono::system_clock::time_point start_time;
+    int64_t local_start_time_ms;
+    double distance;
+    int sample_cnt;
+    FILE *fp;
 };
 #endif
