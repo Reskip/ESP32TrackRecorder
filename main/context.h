@@ -20,6 +20,8 @@ struct Context {
         select_btn_id(0),
         brightness(0),
         enable_wifi(false),
+        enable_web_server(false),
+        ip(""),
         enable_track(false),
         last_fresh_ts_ms(0),
         fresh_ts_diff_ms(0),
@@ -36,10 +38,13 @@ struct Context {
     Battery& battery_state;
     Encoder& encoder_state;
     Trace& trace_state;
+
     int select_page_id;
     int select_btn_id;
     int brightness;
     bool enable_wifi;
+    bool enable_web_server;
+    std::string ip;
     bool enable_track;
 
     int64_t last_fresh_ts_ms;

@@ -45,3 +45,15 @@ void close_gpx(FILE *fp) {
     fprintf(fp, header);
     fclose(fp);
 }
+
+int get_battery_level(int battery) {
+    if (battery > 70) {
+        return 3;
+    } else if (battery > 40) {
+        return 2;
+    } else if (battery > 10) {
+        return 1;
+    } else {
+        return 0;
+    }
+}

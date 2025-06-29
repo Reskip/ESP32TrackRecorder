@@ -67,6 +67,8 @@ public:
     bool init();
     bool send_ubx_command(const uint8_t* command, size_t length);
     bool wait_for_ack(uint8_t class_id, uint8_t msg_id);
+    bool lock();
+    bool unlock();
 
     gpio_num_t gpio_tx;
     gpio_num_t gpio_rx;

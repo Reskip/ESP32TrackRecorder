@@ -92,11 +92,11 @@ void DisplayManager::updateDisplay(Context &context) {
     }
 
     oled.clear();
-    while (xSemaphoreTake(context.gnss_state.mutex, pdMS_TO_TICKS(10)) != pdTRUE) {}
+    context.gnss_state.lock();
     main_page->render(context, oled);
     for (int i = 0; i < side_pages.size(); i++) {
         side_pages[i]->render(context, oled);
     }
-    xSemaphoreGive(context.gnss_state.mutex);
+    context.gnss_state.unlock();
     oled.refresh(true);
 }

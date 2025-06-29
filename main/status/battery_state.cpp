@@ -63,7 +63,7 @@ float Battery::read_soc() const {
 }
 
 bool Battery::is_charging() const {
-    return gpio_get_level(charging);
+    return !gpio_get_level(charging);
 }
 
 bool Battery::read_register(uint8_t reg, uint16_t *value) const {

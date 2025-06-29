@@ -3,6 +3,8 @@
 #include <iostream>
 #include <algorithm>
 
+#include "esp_wifi.h"
+
 #include "setting_page.h"
 #include "icon/setting_icon.h"
 #include "icon/icon.h"
@@ -17,6 +19,11 @@ SettingPage::SettingPage()
     Button wifi_btn(Button::PRESS, "WIFI ", 0, Y_MARGIN + 0);
     wifi_btn.set_callback([](Button* btn, Context* context) {
         context->enable_wifi = btn->get_press_state();
+        if (context->enable_wifi) {
+            ESP_ERROR_CHECK(esp_wifi_start());
+        } else {
+            ESP_ERROR_CHECK(esp_wifi_stop());
+        }
     });
 
     Button track_btn(Button::PRESS, "TRACK", 0, Y_MARGIN + 12);

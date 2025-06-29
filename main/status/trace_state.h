@@ -20,6 +20,8 @@ struct WayPoint {
     std::optional<double> hdop;
     std::optional<double> speed;
     
+    WayPoint() 
+        : latitude(0), longitude(0) {}
     WayPoint(double lat, double lon)
         : latitude(lat), longitude(lon) {}
 
@@ -36,7 +38,9 @@ public:
         distance = 0.0;
         sample_cnt = 0;
         local_start_time_ms = 0;
+        closed = true;
         fp = nullptr;
+        mutex = xSemaphoreCreateMutex();
     };
     ~Trace() = default;
 
@@ -59,15 +63,19 @@ public:
     }
 
     void try_close_trace();
-
     int get_duration_ms();
+    bool lock();
+    bool unlock();
 
 private:
+    SemaphoreHandle_t mutex;
     std::vector<WayPoint> current_trace;
+    WayPoint last_point;
     std::chrono::system_clock::time_point start_time;
     int64_t local_start_time_ms;
     double distance;
     int sample_cnt;
+    bool closed;
     FILE *fp;
 };
 #endif

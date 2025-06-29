@@ -271,7 +271,7 @@ bool GNSSState::parse() {
         }
     }
 
-    while (xSemaphoreTake(mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
+    lock();
     if (update_rmc) {
         if (valid && _valid) {
             double ts_before = hour + (minute / 60.0) + (second / 3600.0) + (microseconds / 3.6e9);
@@ -319,7 +319,7 @@ bool GNSSState::parse() {
     if (update_gga || update_gsv || update_gsa) {
         satellites = std::move(satellites_copy);
     }
-    xSemaphoreGive(mutex);
+    unlock();
     return true;
 }
 
@@ -356,4 +356,14 @@ bool GNSSState::wait_for_ack(uint8_t class_id, uint8_t msg_id) {
 
     ESP_LOGE(GNSS_TAG, "Timeout waiting for UBX ACK");
     return false;
+}
+
+bool GNSSState::lock() {
+    while (xSemaphoreTake(mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
+    return true;
+}
+
+bool GNSSState::unlock() {
+    xSemaphoreGive(mutex);
+    return true;
 }

@@ -5,6 +5,7 @@
 #include "status_page.h"
 #include "icon/icon.h"
 #include "icon/status_icon.h"
+#include "utils/utils.h"
 
 #define Y_MARGIN 10
 #define X_MARGIN 36
@@ -14,16 +15,24 @@ StatusPage::StatusPage()
 
 void StatusPage::render_expand(Context &context, OLED &oled) {
     int start_x = std::round(get_sidebar_start_pos_x());
+
+    int battery_idx = 0;
+    if (context.battery_state.is_charging()) {
+        battery_idx = 4;
+    } else {
+        battery_idx = get_battery_level(context.battery_state.read_soc());
+    }
     float battery = context.battery_state.read_soc();
     if (battery > 100) {
         battery = 100.0;
     }
+
     while (xSemaphoreTake(context.storage_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
     double flash_use_rate = (context.flash_used * 100.0) / context.flash_total;
     double ram_use_rate = (context.ram_used * 100.0) / context.ram_total;
     xSemaphoreGive(context.storage_mutex);
 
-    oled.draw_bitmap(start_x + X_MARGIN + 48, 0, (const uint8_t*) battery_icon[4], 13, 7);
+    oled.draw_bitmap(start_x + X_MARGIN + 48, 0, (const uint8_t*) battery_icon[battery_idx], 13, 7);
     oled.draw_string(start_x + X_MARGIN, 0, "FPS", WHITE, BLACK);
     oled.draw_string(start_x + X_MARGIN, 12, "RAM", WHITE, BLACK);
     oled.draw_string(start_x + X_MARGIN, 24, "FLASH", WHITE, BLACK);

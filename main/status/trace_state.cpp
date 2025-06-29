@@ -74,11 +74,15 @@ std::string WayPoint::to_gpx_string() const {
 void Trace::add_waypoint(GNSSState &gnss_state) {
     WayPoint waypoint(gnss_state);
 
+    lock();
+
     if (current_trace.empty()) {
         start_time = *waypoint.timestamp;
         current_trace.clear();
         distance = 0.0;
         sample_cnt = 0;
+        closed = false;
+        last_point = waypoint;
         local_start_time_ms = esp_timer_get_time() / 1000;
         auto time_t = std::chrono::system_clock::to_time_t(start_time);
         std::tm* tm = std::gmtime(&time_t);
@@ -89,12 +93,12 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
         fp = fopen(file_name.c_str(), "w");
         init_gpx(fp);
     } else {
-        const auto& last_point = current_trace.back();
         double _distance = haversine_distance(
             last_point.latitude, last_point.longitude,
             waypoint.latitude, waypoint.longitude
         );
         distance += _distance;
+        last_point = waypoint;
     }
 
     fprintf(fp, "           %s\n", waypoint.to_gpx_string().c_str());
@@ -103,14 +107,15 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
         current_trace.push_back(waypoint);
     }
     sample_cnt += 1;
+
+    unlock();
 }
 
 void Trace::try_close_trace() {
-    if (current_trace.empty()) {
+    if (closed) {
         return;
     }
-    current_trace.clear();
-    local_start_time_ms = 0;
+    closed = true;
     close_gpx(fp);
 }
 
@@ -119,4 +124,13 @@ int Trace::get_duration_ms() {
         return 0;
     }
     return (esp_timer_get_time() / 1000) - local_start_time_ms;
+}
+
+bool Trace::lock() {
+    while (xSemaphoreTake(mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
+    return true;
+}
+bool Trace::unlock() {
+    xSemaphoreGive(mutex);
+    return true;
 }

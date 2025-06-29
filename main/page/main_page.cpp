@@ -4,27 +4,21 @@
 
 #include "main_page.h"
 #include "icon/icon.h"
+#include "utils/utils.h"
 
 MainPage::MainPage()
     : Page("MainPage") {
         set_state(PageState::NORMAL);
     }
 
-int get_battery_level(int battery) {
-    if (battery > 70) {
-        return 3;
-    } else if (battery > 40) {
-        return 2;
-    } else if (battery > 10) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
 void MainPage::render_normal(Context &context, OLED &oled) {
-    float battery = context.battery_state.read_soc();
-    oled.draw_bitmap(0, 0, (const uint8_t*) battery_icon[get_battery_level(battery)], 13, 7);
+    int battery_idx = 0;
+    if (context.battery_state.is_charging()) {
+        battery_idx = 4;
+    } else {
+        battery_idx = get_battery_level(context.battery_state.read_soc());
+    }
+    oled.draw_bitmap(0, 0, (const uint8_t*) battery_icon[battery_idx], 13, 7);
 
     std::ostringstream timeBatteryStream;
     int hour = (context.gnss_state.hour + context.timezone + 24) % 24;
