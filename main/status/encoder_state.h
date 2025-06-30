@@ -8,8 +8,7 @@
 #define ENCODERSTATE
 
 #define ENCODER_TAG "EncoderState"
-#define DEBOUNCE_SAME_TIME_MS 80
-#define DEBOUNCE_SWITCH_TIME_MS 200
+#define DEBOUNCE_TIME_MS 80
 
 typedef struct {
     int position;
@@ -33,6 +32,11 @@ private:
 
     uint32_t last_press_key;
     uint32_t last_interrupt_time;
+
+    uint8_t encoder_a_last;
+    uint8_t encoder_b_last;
+    uint8_t value_count;
+
     uint8_t press_status;
     static void IRAM_ATTR encoder_isr_scroll_handler(void *arg);
 };

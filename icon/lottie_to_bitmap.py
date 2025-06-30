@@ -1,6 +1,5 @@
 from PIL import Image
 import numpy as np
-import pygame
 
 def gif_to_cpp_matrix(gif_path, output_file, matrix_size=None):
     # Open the GIF file
@@ -18,7 +17,7 @@ def gif_to_cpp_matrix(gif_path, output_file, matrix_size=None):
         img_array = np.array(img_gray)
         # print(img_array)
         # img_gray.show()
-        binary_matrix = (img_array < 64).astype(int)  # Convert to 0/1 based on threshold
+        binary_matrix = (img_array < 228).astype(int)  # Convert to 0/1 based on threshold
         
         frames.append(binary_matrix)
         
@@ -69,5 +68,5 @@ def gif_to_cpp_matrix(gif_path, output_file, matrix_size=None):
 
 # Example usage
 gif_to_cpp_matrix(
-    "system-solid-114-edit-pencil-rename-hover-edit.gif",
+    "system-solid-102-wifi-hover-wifi.gif",
     "output.cpp", matrix_size=(24, 24))

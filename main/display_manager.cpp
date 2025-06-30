@@ -12,7 +12,7 @@
 #include "page/status_page.h"
 #include "page/gnss_page.h"
 #include "page/setting_page.h"
-#include "page/storage_page.h"
+#include "page/wifi_page.h"
 #include "page/track_page.h"
 
 DisplayManager::DisplayManager(gpio_num_t scl, gpio_num_t sda)
@@ -22,7 +22,7 @@ DisplayManager::DisplayManager(gpio_num_t scl, gpio_num_t sda)
         side_pages.push_back(std::make_unique<StatusPage>());
         side_pages.push_back(std::make_unique<TrackPage>());
         side_pages.push_back(std::make_unique<GNSSPage>());
-        side_pages.push_back(std::make_unique<StoragePage>());
+        side_pages.push_back(std::make_unique<WifiPage>());
         side_pages.push_back(std::make_unique<SettingPage>());
         
         for (int i = 0; i < side_pages.size(); i++) {

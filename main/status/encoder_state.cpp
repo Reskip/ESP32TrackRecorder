@@ -3,8 +3,12 @@
 
 Encoder::Encoder(
     gpio_num_t ec_a, gpio_num_t ec_b, gpio_num_t ec_key)
-    : ec_a(ec_a), ec_b(ec_b), ec_key(ec_key), last_interrupt_time(0) {
+    : ec_a(ec_a), ec_b(ec_b), ec_key(ec_key) {
     press_status = 0;
+    last_interrupt_time = 0;
+    encoder_a_last = 0;
+    encoder_b_last = 0;
+    value_count = 0;
 }
 
 Encoder::~Encoder() {
@@ -20,7 +24,7 @@ bool Encoder::init() {
     gpio_config_t io_conf_b = {};
     gpio_config_t io_conf_key = {};
 
-    io_conf_a.intr_type = GPIO_INTR_NEGEDGE;
+    io_conf_a.intr_type = GPIO_INTR_ANYEDGE;
     io_conf_a.mode = GPIO_MODE_INPUT;
     io_conf_a.pull_up_en = GPIO_PULLUP_ENABLE;
     io_conf_a.pull_down_en = GPIO_PULLDOWN_DISABLE;
@@ -47,32 +51,55 @@ bool Encoder::init() {
 
 void IRAM_ATTR Encoder::encoder_isr_scroll_handler(void *arg) {
     Encoder *encoder = static_cast<Encoder *>(arg);
+    if (!encoder->press_status) {
+        return;
+    }
 
     encoder_event_t event;
-    int A = gpio_get_level(encoder->ec_a);
-    int B = gpio_get_level(encoder->ec_b);
-    if (A == 0 || !encoder->press_status) {
+    if (encoder->value_count == 0) {
+        encoder->encoder_a_last = gpio_get_level(encoder->ec_a);
+        encoder->encoder_b_last = gpio_get_level(encoder->ec_b);
+        encoder->value_count = 1;
         return;
+    } else {
+        uint8_t a_now = gpio_get_level(encoder->ec_a);
+        uint8_t b_now = gpio_get_level(encoder->ec_b);
+        encoder->value_count = 0;
+        if (
+            ((encoder->encoder_a_last == 0 && a_now == 1)
+            && (encoder->encoder_b_last == 1 && b_now == 0))
+            || ((encoder->encoder_a_last == 1 && a_now == 0)
+            && (encoder->encoder_b_last == 0 && b_now == 1))
+        ) {
+            event.position = 1;
+        } else if (
+            ((encoder->encoder_a_last == 0 && a_now == 1)
+            && (encoder->encoder_b_last == 0 && b_now == 1))
+            || ((encoder->encoder_a_last == 1 && a_now == 0)
+            && (encoder->encoder_b_last == 1 && b_now == 0))
+        ) {
+            event.position = -1;
+        } else {
+            encoder->encoder_a_last = a_now;
+            encoder->encoder_b_last = b_now;
+            event.position = 0;
+            encoder->value_count = 1;
+        }
     }
-    event.position = (A == B) ? -1 : 1;
 
-    uint32_t current_time = xTaskGetTickCountFromISR();
-    uint32_t min_diff_time = DEBOUNCE_SAME_TIME_MS;
-    if (event.position != encoder->last_press_key) {
-        min_diff_time = DEBOUNCE_SWITCH_TIME_MS;
+    if (event.position) {
+        uint32_t current_time = xTaskGetTickCountFromISR();
+        if (current_time - encoder->last_interrupt_time < pdMS_TO_TICKS(DEBOUNCE_TIME_MS)) {
+            return;
+        }
+        encoder->last_press_key = event.position;
+        xQueueSendFromISR(encoder->encoder_queue, &event, NULL);
     }
-    if (current_time - encoder->last_interrupt_time < pdMS_TO_TICKS(min_diff_time)) {
-        return;
-    }
-    encoder->last_interrupt_time = current_time;
-    encoder->last_press_key = event.position;
-
-    xQueueSendFromISR(encoder->encoder_queue, &event, NULL);
 }
 
 void Encoder::encoder_press_handler() {
     uint32_t current_time = xTaskGetTickCountFromISR();
-    if (current_time - last_interrupt_time < pdMS_TO_TICKS(DEBOUNCE_SAME_TIME_MS)) {
+    if (current_time - last_interrupt_time < pdMS_TO_TICKS(DEBOUNCE_TIME_MS)) {
         return;
     }
     
