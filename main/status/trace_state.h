@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "gnss_state.h"
+#include "utils/json.hpp"
 
 #ifndef TRACESTATE
 #define TRACESTATE
@@ -40,6 +41,7 @@ public:
         local_start_time_ms = 0;
         closed = true;
         fp = nullptr;
+        current_trace = nlohmann::json::array();
         mutex = xSemaphoreCreateMutex();
     };
     ~Trace() = default;
@@ -58,7 +60,7 @@ public:
         return sample_cnt;
     }
 
-    const std::vector<WayPoint>& get_waypoints() const {
+    const nlohmann::json& get_waypoints() const {
         return current_trace;
     }
 
@@ -69,8 +71,8 @@ public:
 
 private:
     SemaphoreHandle_t mutex;
-    std::vector<WayPoint> current_trace;
     WayPoint last_point;
+    nlohmann::json current_trace;
     std::chrono::system_clock::time_point start_time;
     int64_t local_start_time_ms;
     double distance;

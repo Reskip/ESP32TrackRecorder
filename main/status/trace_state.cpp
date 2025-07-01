@@ -76,13 +76,15 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
 
     lock();
 
-    if (current_trace.empty()) {
+    if (closed || sample_cnt == 0) {
         start_time = *waypoint.timestamp;
-        current_trace.clear();
+        current_trace = nlohmann::json::array();
+
         distance = 0.0;
         sample_cnt = 0;
         closed = false;
         last_point = waypoint;
+
         local_start_time_ms = esp_timer_get_time() / 1000;
         auto time_t = std::chrono::system_clock::to_time_t(start_time);
         std::tm* tm = std::gmtime(&time_t);
@@ -104,7 +106,14 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
     fprintf(fp, "           %s\n", waypoint.to_gpx_string().c_str());
 
     if (sample_cnt % SAMPLE_RATE == 0) {
-        current_trace.push_back(waypoint);
+        nlohmann::json point_json = {
+            {"lat", waypoint.latitude},
+            {"lon", waypoint.longitude},
+            {"alt", *(waypoint.elevation)},
+            {"speed", *(waypoint.speed)},
+            {"hdop", *(waypoint.hdop)}
+        };
+        current_trace.push_back(point_json);
     }
     sample_cnt += 1;
 

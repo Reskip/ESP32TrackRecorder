@@ -32,7 +32,10 @@ struct Context {
         flash_used(0),
         ram_total(0),
         ram_used(0),
-        statue_change_flag(false) {
+        statue_change_flag(false),
+        timezone(0),
+        wifi_ssid(""),
+        wifi_passwd("") {
         }
     GNSSState& gnss_state;
     Battery& battery_state;
