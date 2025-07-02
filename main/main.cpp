@@ -36,37 +36,33 @@
 
 void load_config(Context &context) {
     using json = nlohmann::json;
-    std::string conf_file_path = MOUNT_POINT "/" CONFIG_FILE;
+    const std::string conf_file_path = MOUNT_POINT "/" CONFIG_FILE;
 
     if (!std::filesystem::exists(conf_file_path)) {
-        json config = {
+        const json config = {
             {"timezone", 8},
             {"wifi_ssid", ""},
             {"wifi_passwd", ""}
         };
-
-        std::ofstream file(conf_file_path);
-        if (file.is_open()) {
-            file << config.dump(4);
-            file.close();
-        }
+        
+        std::ofstream(conf_file_path) << config.dump(4);
         return;
     }
 
     std::ifstream file(conf_file_path);
     if (!file.is_open()) {
-        std::cerr << "Error: Cannot open config file!" << std::endl;
+        std::cerr << "无法打开配置文件!" << std::endl;
         return;
     }
-    
+
     json config;
     file >> config;
-    file.close();
 
     if (config.is_discarded()) {
-        std::cerr << "Error: Invalid JSON format!" << std::endl;
+        std::cerr << "JSON格式错误!" << std::endl;
         return;
     }
+
     context.timezone = config.value("timezone", 8);
     context.wifi_ssid = config.value("wifi_ssid", "");
     context.wifi_passwd = config.value("wifi_passwd", "");

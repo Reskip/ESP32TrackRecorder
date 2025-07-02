@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "esp_log.h"
 #include "nvs_flash.h"
 
@@ -123,9 +125,10 @@ esp_err_t WebManager::init() {
     strncpy(reinterpret_cast<char*>(wifi_config.sta.password), 
             context->wifi_passwd.c_str(), 
             sizeof(wifi_config.sta.password) - 1);
-    
+
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+
     return ESP_OK;
 }
 
