@@ -104,6 +104,7 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
     }
 
     fprintf(fp, "           %s\n", waypoint.to_gpx_string().c_str());
+    fflush(fp);
 
     if (sample_cnt % SAMPLE_RATE == 0) {
         nlohmann::json point_json = {
@@ -139,6 +140,7 @@ bool Trace::lock() {
     while (xSemaphoreTake(mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
     return true;
 }
+
 bool Trace::unlock() {
     xSemaphoreGive(mutex);
     return true;

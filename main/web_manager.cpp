@@ -15,16 +15,38 @@ esp_err_t WebManager::root_handler(httpd_req_t *req) {
 esp_err_t WebManager::trace_handler(httpd_req_t *req) {
     Context *context_ptr = (Context*) req->user_ctx;
     context_ptr->trace_state.lock();
-
-    nlohmann::json trace_response = {
+   nlohmann::json trace_response = {
         {"in_track", context_ptr->enable_track},
         {"distance", context_ptr->trace_state.get_distance()}
     };
     trace_response["trace"] = context_ptr->trace_state.get_waypoints();
     context_ptr->trace_state.unlock();
 
-    httpd_resp_set_type(req, "text/json");
+    httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, trace_response.dump(4).c_str(), HTTPD_RESP_USE_STRLEN);
+}
+
+esp_err_t satellites_get_handler(httpd_req_t *req) {
+    Context *context_ptr = (Context*) req->user_ctx;
+    nlohmann::json satellites_response;
+    satellites_response["satellites"] = nlohmann::json::array();
+
+    context_ptr->gnss_state.lock();
+    for (const Satellite& sat : context_ptr->gnss_state.satellites) {
+        nlohmann::json jsat;
+        jsat["type"] = sat.sat_type;
+        jsat["nr"] = sat.nr;
+        jsat["elevation"] = sat.elevation;
+        jsat["azimuth"] = sat.azimuth;
+        jsat["snr"] = sat.snr;
+        jsat["in_use"] = sat.in_use;
+        satellites_response["satellites"].push_back(jsat);
+    }
+    context_ptr->gnss_state.unlock();
+    std::string resp_str = satellites_response.dump();
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp_str.c_str(), resp_str.length());
+    return ESP_OK;
 }
 
 void WebManager::event_handler(void* arg, esp_event_base_t event_base,
@@ -66,6 +88,14 @@ void WebManager::register_uri_handlers() {
         .user_ctx = context_ptr,
     };
     httpd_register_uri_handler(server, &trace_uri);
+
+    httpd_uri_t satellites_uri = {
+        .uri = "/satellites",
+        .method = HTTP_GET,
+        .handler = satellites_get_handler,
+        .user_ctx = context_ptr
+    };
+    httpd_register_uri_handler(server, &satellites_uri);
 }
 
 esp_err_t WebManager::start_webserver() {
@@ -96,13 +126,11 @@ esp_err_t WebManager::init() {
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    // 注册事件处理程序
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, this, NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
         IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, this, NULL));
 
-    // 初始化STA网络接口
     esp_netif_t *sta_netif = esp_netif_create_default_wifi_sta();
     assert(sta_netif);
 
@@ -132,7 +160,6 @@ esp_err_t WebManager::init() {
     return ESP_OK;
 }
 
-// 停止Web服务器
 void WebManager::stop_webserver() {
     if (server) {
         httpd_stop(server);
@@ -140,7 +167,6 @@ void WebManager::stop_webserver() {
     }
 }
 
-// 获取当前IP地址
 std::string WebManager::get_ip() const {
     Context *context = static_cast<Context*>(context_ptr);
     return context->ip;
