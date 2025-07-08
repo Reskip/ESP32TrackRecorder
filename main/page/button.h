@@ -22,7 +22,7 @@ public:
 
     void set_callback(Callback callback);
     void configure_press(bool initial_state = false);
-    void configure_scroll(const std::vector<int>& values = {}, size_t initial_index = 0);
+    void configure_scroll(const std::vector<std::string>& names = {}, const std::vector<int>& values = {}, size_t initial_index = 0);
     void configure_icon(char* button_icon, int icon_w, int icon_h, bool show_icon_value);
     void render(Context &context, OLED &oled, int start_x);
     bool handle_press(Context &context);
@@ -32,6 +32,7 @@ public:
     int get_x_pos() const;
     int get_y_pos() const;
     bool get_press_state() const;
+    int get_scroll_state() const;
 
 private:
     Type type_;
@@ -44,6 +45,7 @@ private:
 
     bool press_state_;
     std::vector<int> scroll_values_;
+    std::vector<std::string> scroll_names_;
     size_t scroll_index_;
 
     Callback callback_;

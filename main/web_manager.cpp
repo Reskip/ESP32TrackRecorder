@@ -49,6 +49,27 @@ esp_err_t satellites_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+esp_err_t sdcard_files_handler(httpd_req_t *req) {
+    nlohmann::json jresp;
+    jresp["files"] = nlohmann::json::array();
+
+    std::string sd_path = MOUNT_POINT;
+
+    for (const auto& entry : std::filesystem::directory_iterator(sd_path)) {
+        if (entry.is_regular_file()) {
+            nlohmann::json jfile;
+            jfile["name"] = entry.path().filename().string();
+            jfile["size"] = entry.file_size();
+            jresp["files"].push_back(jfile);
+        }
+    }
+
+    std::string resp_str = jresp.dump();
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp_str.c_str(), resp_str.length());
+    return ESP_OK;
+}
+
 void WebManager::event_handler(void* arg, esp_event_base_t event_base,
                               int32_t event_id, void* event_data) {
     WebManager* web_manager = static_cast<WebManager*>(arg);
@@ -96,6 +117,14 @@ void WebManager::register_uri_handlers() {
         .user_ctx = context_ptr
     };
     httpd_register_uri_handler(server, &satellites_uri);
+
+    httpd_uri_t sdcard_files_uri = {
+        .uri       = "/sdcard_files",
+        .method    = HTTP_GET,
+        .handler   = sdcard_files_handler,
+        .user_ctx  = NULL
+    };
+    httpd_register_uri_handler(server, &sdcard_files_uri);
 }
 
 esp_err_t WebManager::start_webserver() {

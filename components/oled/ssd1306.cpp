@@ -134,7 +134,7 @@ bool OLED::init() {
 		command(address, 0xda); // SSD1306_SETCOMPINS
 		command(address, 0x02);
 		command(address, 0x81); // SSD1306_SETCONTRAST
-		command(address, 0x2f);
+		command(address, 0x7f);
 		command(address, 0xd9); // SSD1306_SETPRECHARGE
 		command(address, 0xf1);
 		command(address, 0xdb); // SSD1306_SETVCOMDETECT
@@ -732,4 +732,9 @@ void OLED::draw_bitmap(int x, int y, const uint8_t* bitmap,
             }
         }
     }
+}
+
+void OLED::set_light(uint8_t light) {
+	command(address, 0x81); // SSD1306_SETCONTRAST
+	command(address, light);
 }

@@ -15,6 +15,13 @@
 SettingPage::SettingPage()
     : SidebarPage("SettingPage", (char*) setting_icon) {
 
+    Button light_btn(Button::SCROLL, "LIGHT", 0, Y_MARGIN + 2);
+    light_btn.configure_scroll({"HIGH", "MID", "LOW"}, {0xff, 0x7f, 0x01}, 1);
+    light_btn.set_callback([](Button* btn, Context* context) {
+        context->brightness = btn->get_scroll_state();
+        context->brightness_change_flag = true;
+    });
+
     Button track_btn(Button::PRESS, "TRACK", 0, Y_MARGIN + 12);
     track_btn.set_callback([](Button* btn, Context* context) {
         context->enable_track = btn->get_press_state();
@@ -26,6 +33,7 @@ SettingPage::SettingPage()
         context->statue_change_flag = true;
     });
 
+    buttons.push_back(light_btn);
     buttons.push_back(track_btn);
     buttons.push_back(return_btn);
 }
@@ -62,6 +70,7 @@ bool SettingPage::handle_press(Context& context, OLED &oled) {
         return true;
     }
     buttons[context.select_btn_id].handle_press(context);
+    select_new_btn(context.select_btn_id, oled, true);
     if (context.statue_change_flag) {
         context.statue_change_flag = false;
         switch_state();
@@ -80,10 +89,17 @@ bool SettingPage::handle_scroll(Context& context, OLED &oled, int value) {
     return true;
 }
 
-void SettingPage::select_new_btn(int btn_id, OLED &oled) {
+void SettingPage::select_new_btn(int btn_id, OLED &oled, bool immidiate) {
     target_select_x = buttons[btn_id].get_x_pos() - 2;
     target_select_y = buttons[btn_id].get_y_pos() - 2;
     target_select_h = 11;
     target_select_w = buttons[btn_id].get_output_weight(oled) + 4;
     select_progress = 0.0;
+    if (immidiate) {
+        select_x = target_select_x;
+        select_y = target_select_y;
+        select_h = target_select_h;
+        select_w = target_select_w;
+        select_progress = 1.0;
+    }
 }

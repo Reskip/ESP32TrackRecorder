@@ -31,7 +31,6 @@
 #include "utils/json.hpp"
 
 #define MAIN_TAG "Main"
-#define MOUNT_POINT "/spiflash"
 #define CONFIG_FILE "CONFIG.TXT"
 
 void load_config(Context &context) {

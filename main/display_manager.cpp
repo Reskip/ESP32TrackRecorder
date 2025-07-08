@@ -54,6 +54,12 @@ void DisplayManager::updateDisplay(Context &context) {
         ESP_LOGI(DISPLAY_TAG, "FPS: %lf", context.fps);
     }
 
+    if (context.brightness_change_flag) {
+        ESP_LOGI(DISPLAY_TAG, "SET BRIGHTNESS: %d", context.brightness);
+        oled.set_light(context.brightness);
+        context.brightness_change_flag = false;
+    }
+
     encoder_event_t event;
     while (xQueueReceive(context.encoder_state.press_queue, &event, 0)){
         if (!event.position) {

@@ -79,6 +79,7 @@ bool WifiPage::handle_press(Context& context, OLED &oled) {
         return true;
     }
     buttons[context.select_btn_id].handle_press(context);
+    select_new_btn(context.select_btn_id, oled, true);
     if (context.statue_change_flag) {
         context.statue_change_flag = false;
         switch_state();
@@ -97,10 +98,17 @@ bool WifiPage::handle_scroll(Context& context, OLED &oled, int value) {
     return true;
 }
 
-void WifiPage::select_new_btn(int btn_id, OLED &oled) {
+void WifiPage::select_new_btn(int btn_id, OLED &oled, bool immidiate) {
     target_select_x = buttons[btn_id].get_x_pos() - 2;
     target_select_y = buttons[btn_id].get_y_pos() - 2;
     target_select_h = 11;
     target_select_w = buttons[btn_id].get_output_weight(oled) + 4;
     select_progress = 0.0;
+    if (immidiate) {
+        select_x = target_select_x;
+        select_y = target_select_y;
+        select_h = target_select_h;
+        select_w = target_select_w;
+        select_progress = 1.0;
+    }
 }

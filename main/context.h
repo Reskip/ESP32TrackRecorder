@@ -6,6 +6,8 @@
 #ifndef CONTEXT
 #define CONTEXT
 
+#define MOUNT_POINT "/spiflash"
+
 struct Context {
     Context(
         GNSSState& gnss_state,
@@ -18,7 +20,7 @@ struct Context {
         trace_state(trace_state),
         select_page_id(2),
         select_btn_id(0),
-        brightness(0),
+        brightness(0x2f),
         enable_wifi(false),
         enable_web_server(false),
         ip(""),
@@ -33,6 +35,7 @@ struct Context {
         ram_total(0),
         ram_used(0),
         statue_change_flag(false),
+        brightness_change_flag(false),
         timezone(0),
         wifi_ssid(""),
         wifi_passwd("") {
@@ -44,7 +47,7 @@ struct Context {
 
     int select_page_id;
     int select_btn_id;
-    int brightness;
+    uint8_t brightness;
     bool enable_wifi;
     bool enable_web_server;
     std::string ip;
@@ -63,6 +66,7 @@ struct Context {
     int64_t ram_used;
 
     bool statue_change_flag;
+    bool brightness_change_flag;
 
     int timezone;
     std::string wifi_ssid;

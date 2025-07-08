@@ -211,6 +211,8 @@ public:
 	 * @param   length      Length of data
 	 */
 	void update_buffer(uint8_t* data, uint16_t length);
+
+	void set_light(uint8_t light);
 };
 
 #endif  /* SSD1306_H */

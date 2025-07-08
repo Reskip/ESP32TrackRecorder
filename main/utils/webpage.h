@@ -92,11 +92,37 @@ const char *html = R"(
         .tile-switcher { top: 18px; z-index: 20; background: #fff; border-radius: 18px; box-shadow: 0 2px 6px #0002; padding: 4px 10px; }
         .tile-switcher button { background: none; border: none; font-size: 15px; color: #333; margin-right: 10px; cursor: pointer; }
         .tile-switcher .active { color: #ff9800; font-weight: bold; }
-        .sidebar-toggle-btn {
-            position: absolute; top: 18px; right: 18px; z-index: 40;
-            background: #ff9800; border-radius: 50%; width: 44px; height: 44px; border: none; color: #fff; font-size: 26px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-            display: flex; align-items: center; justify-content: center; cursor: pointer;
+        .sidebar-toggle-btn, .sdcard-btn, .locate-btn {
+            position: absolute; 
+            right: 18px;
+            background: #ff9800; 
+            border-radius: 50%; 
+            width: 44px; 
+            height: 44px; 
+            border: none; 
+            color: #fff; 
+            font-size: 24px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
+        .sidebar-toggle-btn:hover, .sdcard-btn:hover, .locate-btn:hover {
+            transform: scale(1.08);
+        }
+        .sidebar-toggle-btn { top: 18px; z-index: 40; }
+        .sdcard-btn { top: 70px; z-index: 41; }
+        .locate-btn { bottom: 24px; z-index: 41; }
+        /* SD卡文件列表样式 */
+        .sdcard-file-list {
+            background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001;
+            padding: 16px 12px 12px 12px; margin: 16px; max-height: 60vh; min-height: 80px; overflow-y: auto; font-size: 14px;
+        }
+        .sdcard-file-list table { width: 100%; border-collapse: collapse; }
+        .sdcard-file-list th, .sdcard-file-list td { padding: 4px 6px; text-align: left; white-space: nowrap; }
+        .sdcard-file-list .fn { max-width: 160px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom;}
         .infobar {
             top: 70px; z-index: 21;
             background: #fff; border-radius: 8px; box-shadow: 0 2px 6px #0002;
@@ -115,6 +141,30 @@ const char *html = R"(
             .infobar { left: 18px !important; top: 64px; min-width: 100px; font-size: 14px; }
             .tile-switcher { left: 18px !important; }
         }
+        /* 加载动画 */
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100%;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #ff9800;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        /* 禁用状态样式 */
+        .sidebar-toggle-btn.disabled, .sdcard-btn.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -128,7 +178,9 @@ const char *html = R"(
       <span id="trackStatus"></span>
       <span id="trackLength"></span>
     </div>
-    <button class="sidebar-toggle-btn" id="sidebarToggle">&#9776;</button>
+    <button class="sidebar-toggle-btn" id="sidebarToggle" title="卫星信息">&#9776;</button>
+    <button class="sdcard-btn" id="sdcardBtn" title="SD卡文件">&#128190;</button>
+    <button class="locate-btn" id="locateBtn" title="定位">&#128204;</button>
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header"></div>
         <div class="sidebar-section">
@@ -138,9 +190,13 @@ const char *html = R"(
             <div class="snr-barplot"><div class="snr-barplot-inner" id="snrBar"></div></div>
             <div class="sat-list" id="satList"></div>
         </div>
+        <div class="sdcard-file-list" id="sdcardFileList" style="display:none;">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+        </div>
     </div>
 <script>
-
 // 卫星类型与配色
 function satTypeInfo(type) {
     if (!type) return { label: "其它", color: "#bdbdbd" };
@@ -238,19 +294,143 @@ function switchTile(useGaode) {
 document.getElementById('btn-gaode').onclick = () => switchTile(true);
 document.getElementById('btn-osm').onclick = () => switchTile(false);
 
+// 侧边栏状态管理
+let sidebarOpen = false;
+let currentSidebarContent = null; // 'satellite' 或 'sdcard'
+let isTransitioning = false; // 新增：过渡状态标志
+
 // 侧边栏动画+display控制
 const sidebar = document.getElementById('sidebar');
 const toggleBtn = document.getElementById('sidebarToggle');
-toggleBtn.onclick = () => {
-    if (sidebar.classList.contains('open')) {
+const sdcardBtn = document.getElementById('sdcardBtn');
+const sidebarSection = document.querySelector('.sidebar-section');
+const sdcardFileList = document.getElementById('sdcardFileList');
+
+// 禁用/启用侧边栏按钮
+function disableSidebarButtons() {
+    isTransitioning = true;
+}
+
+function enableSidebarButtons() {
+    isTransitioning = false;
+}
+
+function openSidebar(contentType) {
+    // 如果正在过渡，不执行任何操作
+    if (isTransitioning) return;
+    
+    disableSidebarButtons();
+    
+    if (currentSidebarContent === contentType) {
+        // 关闭当前侧边栏
         sidebar.classList.remove('open');
-        sidebar.addEventListener('transitionend', function handler() {
+        setTimeout(() => {
             sidebar.style.display = 'none';
-            sidebar.removeEventListener('transitionend', handler);
-        });
+            currentSidebarContent = null;
+            sidebarOpen = false;
+            enableSidebarButtons();
+        }, 250);
+        return;
+    }
+    
+    // 如果打开了不同的内容，先关闭当前内容
+    if (sidebarOpen) {
+        sidebar.classList.remove('open');
+        setTimeout(() => {
+            // 切换内容
+            sidebar.classList.add('open');
+            if (contentType === 'satellite') {
+                sidebarSection.style.display = '';
+                sdcardFileList.style.display = 'none';
+            } else if (contentType === 'sdcard') {
+                sidebarSection.style.display = 'none';
+                sdcardFileList.style.display = '';
+                // 显示加载动画
+                sdcardFileList.innerHTML = `
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                `;
+            }
+            
+            // 打开侧边栏
+            sidebar.style.display = 'flex';
+            setTimeout(() => {
+                currentSidebarContent = contentType;
+                sidebarOpen = true;
+                enableSidebarButtons();
+            }, 250);
+            
+        }, 200);
     } else {
+        // 直接打开侧边栏
         sidebar.style.display = 'flex';
-        setTimeout(()=>sidebar.classList.add('open'), 10); // 触发动画
+        setTimeout(() => {
+            sidebar.classList.add('open');
+            
+            if (contentType === 'satellite') {
+                sidebarSection.style.display = '';
+                sdcardFileList.style.display = 'none';
+            } else if (contentType === 'sdcard') {
+                sidebarSection.style.display = 'none';
+                sdcardFileList.style.display = '';
+                // 显示加载动画
+                sdcardFileList.innerHTML = `
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                `;
+            }
+            
+            currentSidebarContent = contentType;
+            sidebarOpen = true;
+            enableSidebarButtons();
+        }, 250);
+    }
+}
+
+toggleBtn.onclick = () => openSidebar('satellite');
+sdcardBtn.onclick = () => {
+    openSidebar('sdcard');
+    // 拉取SD卡文件
+    fetch('/sdcard_files').then(r => r.json()).then(data => {
+        let files = data.files || [];
+        let html = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px;">SD卡文件</div>`;
+        if (!files.length) {
+            html += `<div style="color:#888;">未发现文件</div>`;
+        } else {
+            html += `<table><tr><th>文件名</th><th style="width:72px;">大小</th></tr>`;
+            for (let f of files) {
+                let size = f.size;
+                if (size > 1e6) size = (size/1e6).toFixed(1) + ' MB';
+                else if (size > 1e3) size = (size/1e3).toFixed(1) + ' KB';
+                else size = size + ' B';
+                html += `<tr><td class="fn" title="${f.name}">${f.name}</td><td>${size}</td></tr>`;
+            }
+            html += `</table>`;
+        }
+        sdcardFileList.innerHTML = html;
+    }).catch(() => {
+    })
+};
+
+// 当侧边栏关闭时，恢复内容
+sidebar.addEventListener('transitionend', function() {
+    if (!sidebar.classList.contains('open')) {
+        sdcardFileList.style.display = 'none';
+        sidebarSection.style.display = '';
+        currentSidebarContent = null;
+        sidebarOpen = false;
+        enableSidebarButtons();
+    }
+});
+
+// ========== 右下角定位按钮功能 ==========
+document.getElementById('locateBtn').onclick = function() {
+    if (lastTraceData && lastTraceData.length) {
+        let latest = lastTraceData[lastTraceData.length - 1];
+        map.setView([latest.lat, latest.lon], 18, {animate: true});
+        handleLatestLocation(lastTraceData);
     }
 };
 
@@ -304,13 +484,12 @@ function fetchSatellites() {
 setInterval(fetchSatellites, 2000);
 fetchSatellites();
 
-// 极坐标图（居中，圆圈无边框，不显示卫星id）
+// 极坐标图
 function renderPolarPlot(sats) {
     let c = document.createElement('canvas');
     c.width = c.height = 240;
     let ctx = c.getContext('2d');
     ctx.clearRect(0,0,240,240);
-    // 画圆与径向
     ctx.save();
     ctx.translate(120,120);
     ctx.strokeStyle = '#bbb';
@@ -326,11 +505,10 @@ function renderPolarPlot(sats) {
         ctx.lineTo(100 * Math.sin(rad), -100 * Math.cos(rad));
         ctx.stroke();
     }
-    // 绘制卫星点，SNR=0不显示，圈圈无边框，无ID
     for (let sat of sats) {
         if ((sat.snr||0) === 0) continue;
         let az = sat.azimuth || 0, el = sat.elevation || 0;
-        let r = 100 * (1 - el / 90); // 仰角90在中心，0在外圈
+        let r = 100 * (1 - el / 90);
         let rad = az * Math.PI / 180;
         let info = satTypeInfo(sat.type);
         let cx = r * Math.sin(rad), cy = -r * Math.cos(rad);
@@ -340,14 +518,13 @@ function renderPolarPlot(sats) {
         ctx.globalAlpha = sat.in_use ? 0.55 : 0.19;
         ctx.fill();
         ctx.globalAlpha = 1;
-        // 无边框、无编号
     }
     ctx.restore();
     document.getElementById('polarPlot').innerHTML = '';
     document.getElementById('polarPlot').appendChild(c);
 }
 
-// SNR直方图（无ID，横向居中，横向滚动，覆盖整个区间）
+// SNR直方图
 function renderSnrBar(sats) {
     let minBarW = 12, maxBarW = 24;
     let n = sats.length;
@@ -366,15 +543,12 @@ function renderSnrBar(sats) {
         ctx.fillStyle = info.color;
         ctx.fillRect(18+i*barW, 110-h, barW-3, h);
         ctx.globalAlpha = 1;
-        // 不显示ID
     }
-    // y轴
     ctx.strokeStyle='#888'; ctx.beginPath(); ctx.moveTo(15,10); ctx.lineTo(15,110); ctx.stroke();
     ctx.font='10px sans-serif'; ctx.fillStyle='#555';
     ctx.textAlign = "right";
     ctx.fillText('60', 13, 16); ctx.fillText('0', 13, 112);
 
-    // 填充到容器
     let barContainer = document.getElementById('snrBar');
     barContainer.innerHTML = '';
     barContainer.appendChild(c);
@@ -383,7 +557,6 @@ function renderSnrBar(sats) {
     c.style.display = "block";
 }
  
-// 卫星详细表
 function renderSatList(sats) {
     let html = `<table><tr><th>型号</th><th>编号</th><th>仰角</th><th>方位</th><th>信噪比</th><th>使用中</th></tr>`;
     for (let s of sats) {
@@ -397,7 +570,6 @@ function renderSatList(sats) {
         <td>${s.in_use?'✔️':''}</td>
         </tr>`;
     }
-    // 末尾补空行，避免滚动时遮挡
     let emptyRow = `<tr style="height:24px;"><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td></tr>`;
     for(let i=0;i<6;++i) html += emptyRow;
     html += `</table>`;
