@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -7,6 +8,23 @@
 #include "context.h"
 #include "utils/webpage.h"
 
+std::string urlDecode(const std::string& str) {
+    std::string result;
+    for (size_t i = 0; i < str.length(); ++i) {
+        if (str[i] == '%' && i + 2 < str.length()) {
+            int hex_val;
+            sscanf(str.substr(i + 1, 2).c_str(), "%x", &hex_val);
+            result += static_cast<char>(hex_val);
+            i += 2;
+        } else if (str[i] == '+') {
+            result += ' ';
+        } else {
+            result += str[i];
+        }
+    }
+    return result;
+}
+
 esp_err_t WebManager::root_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "text/html");
     return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
@@ -14,13 +32,13 @@ esp_err_t WebManager::root_handler(httpd_req_t *req) {
 
 esp_err_t WebManager::trace_handler(httpd_req_t *req) {
     Context *context_ptr = (Context*) req->user_ctx;
-    context_ptr->trace_state.lock();
+    context_ptr->trace_state.mutex.lock_read();
    nlohmann::json trace_response = {
         {"in_track", context_ptr->enable_track},
         {"distance", context_ptr->trace_state.get_distance()}
     };
     trace_response["trace"] = context_ptr->trace_state.get_waypoints();
-    context_ptr->trace_state.unlock();
+    context_ptr->trace_state.mutex.unlock_read();
 
     httpd_resp_set_type(req, "application/json");
     return httpd_resp_send(req, trace_response.dump(4).c_str(), HTTPD_RESP_USE_STRLEN);
@@ -31,7 +49,7 @@ esp_err_t satellites_get_handler(httpd_req_t *req) {
     nlohmann::json satellites_response;
     satellites_response["satellites"] = nlohmann::json::array();
 
-    context_ptr->gnss_state.lock();
+    context_ptr->gnss_state.mutex.lock_read();
     for (const Satellite& sat : context_ptr->gnss_state.satellites) {
         nlohmann::json jsat;
         jsat["type"] = sat.sat_type;
@@ -42,7 +60,7 @@ esp_err_t satellites_get_handler(httpd_req_t *req) {
         jsat["in_use"] = sat.in_use;
         satellites_response["satellites"].push_back(jsat);
     }
-    context_ptr->gnss_state.unlock();
+    context_ptr->gnss_state.mutex.unlock_read();
     std::string resp_str = satellites_response.dump();
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, resp_str.c_str(), resp_str.length());
@@ -68,6 +86,69 @@ esp_err_t sdcard_files_handler(httpd_req_t *req) {
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, resp_str.c_str(), resp_str.length());
     return ESP_OK;
+}
+
+esp_err_t download_file_handler(httpd_req_t *req) {
+    char query_str[256];
+    if (httpd_req_get_url_query_str(req, query_str, sizeof(query_str)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing query string");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(WEB_TAG, "query file %s", query_str);
+
+    const char* file_param = strstr(query_str, "file=");
+    if (!file_param) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'file' parameter");
+        return ESP_FAIL;
+    }
+    
+    std::string file_name = urlDecode(file_param + 5);
+    std::string file_path = MOUNT_POINT + std::string("/") + file_name;
+    ESP_LOGI(WEB_TAG, "try load file %s %s", file_name.c_str(), file_path.c_str());
+
+    FILE* file = fopen(file_path.c_str(), "rb");
+    if (file == NULL) {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File not found");
+        return ESP_FAIL;
+    }
+
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    char content_disposition[256];
+    snprintf(content_disposition, sizeof(content_disposition), 
+            "attachment; filename=\"%s\"", file_name.c_str());
+
+    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_hdr(req, "Content-Disposition", content_disposition);
+    httpd_resp_set_hdr(req, "Content-Length", std::to_string(file_size).c_str());
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");
+
+    const size_t buffer_size = 1024;
+    char* buffer = (char*)malloc(buffer_size);
+    if (buffer == NULL) {
+        fclose(file);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Memory allocation failed");
+        return ESP_FAIL;
+    }
+
+    size_t bytes_read;
+    while ((bytes_read = fread(buffer, 1, buffer_size, file)) > 0) {
+        esp_err_t err = httpd_resp_send_chunk(req, buffer, bytes_read);
+        if (err != ESP_OK) {
+            break;
+        }
+    }
+
+    free(buffer);
+    fclose(file);
+
+    httpd_resp_send_chunk(req, NULL, 0);
+    if (bytes_read == 0) {
+        return ESP_OK;
+    }
+    return ESP_FAIL;
 }
 
 void WebManager::event_handler(void* arg, esp_event_base_t event_base,
@@ -125,6 +206,14 @@ void WebManager::register_uri_handlers() {
         .user_ctx  = NULL
     };
     httpd_register_uri_handler(server, &sdcard_files_uri);
+
+    httpd_uri_t download_file_uri = {
+        .uri       = "/download",
+        .method    = HTTP_GET,
+        .handler   = download_file_handler,
+        .user_ctx  = context_ptr
+    };
+    httpd_register_uri_handler(server, &download_file_uri);
 }
 
 esp_err_t WebManager::start_webserver() {

@@ -47,23 +47,44 @@ bool Battery::init() {
     io_conf.pin_bit_mask = (1ULL << charging);
     gpio_config(&io_conf);
 
+    voltage = 0;
+    soc = 0;
+    in_charging = false;
+    request_cache_cnt = REQUEST_CACHE;
     return true;
 }
 
-float Battery::read_voltage() const {
+void Battery::update_all_status() {
+    if (request_cache_cnt < REQUEST_CACHE) {
+        request_cache_cnt += 1;
+        return;
+    }
+    request_cache_cnt = 0;
     uint16_t raw_value;
-    if (!read_register(VCELL_REG, &raw_value)) return -1.0;
-    return (raw_value >> 4) * 0.00125;  // MAX17048 电压转换
+
+    if (!read_register(VCELL_REG, &raw_value)) voltage = -1.0;
+    voltage = (raw_value >> 4) * 0.00125;
+
+    if (!read_register(SOC_REG, &raw_value)) soc = -1.0;
+    soc = raw_value / 256.0;
+
+    in_charging = !gpio_get_level(charging);
+    return;
 }
 
-float Battery::read_soc() const {
-    uint16_t raw_value;
-    if (!read_register(SOC_REG, &raw_value)) return -1.0;
-    return raw_value / 256.0;  // MAX17048 电量转换
+float Battery::read_voltage() {
+    update_all_status();
+    return voltage;
 }
 
-bool Battery::is_charging() const {
-    return !gpio_get_level(charging);
+float Battery::read_soc() {
+    update_all_status();
+    return soc;
+}
+
+bool Battery::is_charging() {
+    update_all_status();
+    return charging;
 }
 
 bool Battery::read_register(uint8_t reg, uint16_t *value) const {
@@ -87,7 +108,7 @@ bool Battery::read_register(uint8_t reg, uint16_t *value) const {
     return true;
 }
 
-void Battery::print_debug_info() const {
+void Battery::print_debug_info() {
     float voltage = read_voltage();
     float soc = read_soc();
     int charging = is_charging();

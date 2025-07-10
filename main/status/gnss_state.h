@@ -7,6 +7,8 @@
 #include "driver/gpio.h"
 #include "minmea.h"
 
+#include "utils/lock.hpp"
+
 #ifndef GNSSSTATE
 #define GNSSSTATE
 
@@ -67,8 +69,6 @@ public:
     bool init();
     bool send_ubx_command(const uint8_t* command, size_t length);
     bool wait_for_ack(uint8_t class_id, uint8_t msg_id);
-    bool lock();
-    bool unlock();
 
     gpio_num_t gpio_tx;
     gpio_num_t gpio_rx;
@@ -87,7 +87,7 @@ public:
 
     char data[BUF_SIZE];
 
-    SemaphoreHandle_t mutex;
+    RWlock mutex;
     std::string timestamp;
     std::vector<Satellite> satellites;
     std::vector<std::pair<double, double>> point_cache;

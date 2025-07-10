@@ -7,6 +7,7 @@
 #include "utils/utils.h"
 
 #define SAMPLE_RATE 5
+#define SAVE_FILE_RATE 30
 
 WayPoint::WayPoint(GNSSState &gnss_state) {
     latitude = gnss_state.latitude;
@@ -74,7 +75,7 @@ std::string WayPoint::to_gpx_string() const {
 void Trace::add_waypoint(GNSSState &gnss_state) {
     WayPoint waypoint(gnss_state);
 
-    lock();
+    mutex.lock_write();
 
     if (closed || sample_cnt == 0) {
         start_time = *waypoint.timestamp;
@@ -84,15 +85,15 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
         sample_cnt = 0;
         closed = false;
         last_point = waypoint;
+        char time_str[50];
 
         local_start_time_ms = esp_timer_get_time() / 1000;
         auto time_t = std::chrono::system_clock::to_time_t(start_time);
         std::tm* tm = std::gmtime(&time_t);
-        char time_str[50];
         std::strftime(time_str, sizeof(time_str), "/%Y-%m-%dT%H-%M-%S.GPX", tm);
-        std::string file_name = std::string(MOUNT_POINT) + std::string(time_str);
-        ESP_LOGI(TRACE_TAG, "file name %s", file_name.c_str());
+        file_name = std::string(MOUNT_POINT) + std::string(time_str);
         fp = fopen(file_name.c_str(), "w");
+        ESP_LOGI(TRACE_TAG, "file name %s", file_name.c_str());
         init_gpx(fp);
     } else {
         double _distance = haversine_distance(
@@ -104,7 +105,11 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
     }
 
     fprintf(fp, "           %s\n", waypoint.to_gpx_string().c_str());
-    fflush(fp);
+
+    if (sample_cnt % SAVE_FILE_RATE == 0) {
+        fclose(fp);
+        fp = fopen(file_name.c_str(), "a+");
+    }
 
     if (sample_cnt % SAMPLE_RATE == 0) {
         nlohmann::json point_json = {
@@ -118,7 +123,7 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
     }
     sample_cnt += 1;
 
-    unlock();
+    mutex.unlock_write();
 }
 
 void Trace::try_close_trace() {
@@ -134,14 +139,4 @@ int Trace::get_duration_ms() {
         return 0;
     }
     return (esp_timer_get_time() / 1000) - local_start_time_ms;
-}
-
-bool Trace::lock() {
-    while (xSemaphoreTake(mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
-    return true;
-}
-
-bool Trace::unlock() {
-    xSemaphoreGive(mutex);
-    return true;
 }

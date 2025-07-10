@@ -60,7 +60,7 @@ bool SettingPage::handle_press(Context& context, OLED &oled) {
     if (get_state() == PageState::NORMAL) {
         switch_state();
 
-        context.select_btn_id = 1;
+        context.select_btn_id = 2;
         select_new_btn(context.select_btn_id, oled);
         select_progress = 1.0;
         select_x = target_select_x;

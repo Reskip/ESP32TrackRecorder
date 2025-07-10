@@ -7,7 +7,7 @@ const char *html = R"(
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalalable=no"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
     <title>ESP32 Track Recorder</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
     <style>
@@ -17,13 +17,12 @@ const char *html = R"(
         .sidebar {
             position: absolute; top: 0; right: 0; height: 100vh; width: 320px; background: rgba(255,255,255,0.96);
             box-shadow: -2px 0 10px 0 rgba(0,0,0,0.12); z-index: 30;
-            display: none;
             transform: translateX(100%);
-            transition: transform 0.25s linear;
+            transition: transform 0.25s ease-out; /* 恢复滑动特效 */
             flex-direction: column;
+            display: flex; /* 改为始终显示，通过transform控制可见性 */
         }
         .sidebar.open {
-            display: flex;
             transform: translateX(0);
         }
         @media (max-width:600px) {
@@ -88,6 +87,7 @@ const char *html = R"(
         .tile-switcher, .infobar {
             position: absolute;
             left: 18px;
+            margin: 10px 0; /* 增加上下margin */
         }
         .tile-switcher { top: 18px; z-index: 20; background: #fff; border-radius: 18px; box-shadow: 0 2px 6px #0002; padding: 4px 10px; }
         .tile-switcher button { background: none; border: none; font-size: 15px; color: #333; margin-right: 10px; cursor: pointer; }
@@ -108,13 +108,15 @@ const char *html = R"(
             justify-content: center; 
             cursor: pointer;
             transition: all 0.2s ease;
+            touch-action: manipulation; /* 防止双击放大 */
+            margin: 10px 0; /* 增加上下margin */
         }
         .sidebar-toggle-btn:hover, .sdcard-btn:hover, .locate-btn:hover {
             transform: scale(1.08);
         }
-        .sidebar-toggle-btn { top: 18px; z-index: 40; }
-        .sdcard-btn { top: 70px; z-index: 41; }
-        .locate-btn { bottom: 24px; z-index: 41; }
+        .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); z-index: 40; } /* 调整顶部位置 */
+        .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); z-index: 41; } /* 调整顶部位置 */
+        .locate-btn { bottom: env(safe-area-inset-bottom, 34px); z-index: 41; } /* 调整底部位置 */
         /* SD卡文件列表样式 */
         .sdcard-file-list {
             background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001;
@@ -124,7 +126,7 @@ const char *html = R"(
         .sdcard-file-list th, .sdcard-file-list td { padding: 4px 6px; text-align: left; white-space: nowrap; }
         .sdcard-file-list .fn { max-width: 160px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom;}
         .infobar {
-            top: 70px; z-index: 21;
+            top: calc(env(safe-area-inset-top, 28px) + 52px); z-index: 21;
             background: #fff; border-radius: 8px; box-shadow: 0 2px 6px #0002;
             padding: 10px 14px; font-size: 16px; color: #222; min-width: 170px;
             display: flex; flex-direction: column; gap: 4px;
@@ -138,8 +140,11 @@ const char *html = R"(
         .infobar .status.stopped { background: #888; }
         @media (max-width:500px) {
             .sidebar { width: 100vw !important; }
-            .infobar { left: 18px !important; top: 64px; min-width: 100px; font-size: 14px; }
-            .tile-switcher { left: 18px !important; }
+            .infobar { left: 18px !important; top: calc(env(safe-area-inset-top, 28px) + 52px); min-width: 100px; font-size: 14px; }
+            .tile-switcher { left: 18px !important; top: env(safe-area-inset-top, 28px); }
+            .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); }
+            .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); }
+            .locate-btn { bottom: env(safe-area-inset-bottom, 34px); }
         }
         /* 加载动画 */
         .loading-spinner {
@@ -247,6 +252,7 @@ function setupMapActionListener() {
         });
     });
 }
+
 function handleLatestLocation(traceArr) {
     if (!traceArr || traceArr.length === 0) return;
     let latest = traceArr[traceArr.length - 1];
@@ -254,7 +260,8 @@ function handleLatestLocation(traceArr) {
 
     // 第一次定位自动居中
     if (firstLocate) {
-        map.setView([latest.lat, latest.lon], map.getZoom() || 16);
+        let [lon, lat] = transform.wgs84ToGcj02(latest.lon, latest.lat)
+        map.setView([lat, lon], map.getZoom() || 16);
         lastLocatedPoint = latestCoord;
         firstLocate = false;
         return;
@@ -275,6 +282,25 @@ function initMap() {
     tileGaode.addTo(map);
     trackLayer = L.layerGroup().addTo(map);
     setupMapActionListener();
+    
+    // 监听窗口大小变化，调整地图尺寸
+    window.addEventListener('resize', () => {
+        if (map) {
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 100);
+        }
+    });
+    
+    // 处理页面可见性变化
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            // 页面从后台切换回来时，重新调整地图尺寸
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+    });
 }
 initMap();
 
@@ -297,7 +323,8 @@ document.getElementById('btn-osm').onclick = () => switchTile(false);
 // 侧边栏状态管理
 let sidebarOpen = false;
 let currentSidebarContent = null; // 'satellite' 或 'sdcard'
-let isTransitioning = false; // 新增：过渡状态标志
+let isTransitioning = false; // 过渡状态标志
+let isLoadingFiles = false; // 文件加载状态标志
 
 // 侧边栏动画+display控制
 const sidebar = document.getElementById('sidebar');
@@ -306,122 +333,112 @@ const sdcardBtn = document.getElementById('sdcardBtn');
 const sidebarSection = document.querySelector('.sidebar-section');
 const sdcardFileList = document.getElementById('sdcardFileList');
 
-// 禁用/启用侧边栏按钮
-function disableSidebarButtons() {
-    isTransitioning = true;
+// 等待侧边栏动画完成的Promise
+function waitForTransition(element) {
+    return new Promise(resolve => {
+        const handler = () => {
+            element.removeEventListener('transitionend', handler);
+            resolve();
+        };
+        element.addEventListener('transitionend', handler);
+        // 设置超时，防止动画未触发
+        setTimeout(resolve, 300);
+    });
 }
 
-function enableSidebarButtons() {
-    isTransitioning = false;
-}
-
-function openSidebar(contentType) {
-    // 如果正在过渡，不执行任何操作
-    if (isTransitioning) return;
+async function openSidebar(contentType) {
+    // 如果正在过渡或正在加载文件，不执行任何操作
+    if (isTransitioning || (contentType === 'sdcard' && isLoadingFiles)) return;
     
-    disableSidebarButtons();
+    isTransitioning = true; // 只设置过渡状态，不禁用按钮
     
     if (currentSidebarContent === contentType) {
         // 关闭当前侧边栏
         sidebar.classList.remove('open');
-        setTimeout(() => {
-            sidebar.style.display = 'none';
-            currentSidebarContent = null;
-            sidebarOpen = false;
-            enableSidebarButtons();
-        }, 250);
+        await waitForTransition(sidebar);
+        sidebarSection.style.display = '';
+        sdcardFileList.style.display = 'none';
+        currentSidebarContent = null;
+        sidebarOpen = false;
+        isTransitioning = false;
         return;
     }
     
     // 如果打开了不同的内容，先关闭当前内容
     if (sidebarOpen) {
         sidebar.classList.remove('open');
-        setTimeout(() => {
-            // 切换内容
-            sidebar.classList.add('open');
-            if (contentType === 'satellite') {
-                sidebarSection.style.display = '';
-                sdcardFileList.style.display = 'none';
-            } else if (contentType === 'sdcard') {
-                sidebarSection.style.display = 'none';
-                sdcardFileList.style.display = '';
-                // 显示加载动画
+        await waitForTransition(sidebar);
+    }
+    
+    // 切换内容
+    sidebarSection.style.display = contentType === 'satellite' ? '' : 'none';
+    sdcardFileList.style.display = contentType === 'sdcard' ? '' : 'none';
+    
+    // 如果是加载SD卡文件，显示加载动画并异步加载
+    if (contentType === 'sdcard') {
+        sdcardFileList.innerHTML = `
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+            </div>
+        `;
+        
+        // 延迟加载，确保动画显示
+        setTimeout(async () => {
+            isLoadingFiles = true;
+            try {
+                const response = await fetch('/sdcard_files');
+                if (!response.ok) throw new Error('Failed to fetch files');
+                
+                const data = await response.json();
+                let files = data.files || [];
+                let html = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px;">SD卡文件</div>`;
+                
+                if (!files.length) {
+                    html += `<div style="color:#888;">未发现文件</div>`;
+                } else {
+                    html += `<table><tr><th>文件名</th><th style="width:72px;">大小</th></tr>`;
+                    for (let f of files) {
+                        let size = f.size;
+                        if (size > 1e6) size = (size/1e6).toFixed(1) + ' MB';
+                        else if (size > 1e3) size = (size/1e3).toFixed(1) + ' KB';
+                        else size = size + ' B';
+                        html += `<tr><td class="fn" title="${f.name}"><a href="/download?file=${f.name}" download>${f.name}</a></td><td>${size}</td></tr>`;
+                    }
+                    html += `</table>`;
+                }
+                
+                sdcardFileList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading SD card files:', error);
                 sdcardFileList.innerHTML = `
-                    <div class="loading-spinner">
-                        <div class="spinner"></div>
+                    <div style="color:red; text-align:center; padding:20px;">
+                        加载文件失败，请重试
                     </div>
                 `;
+            } finally {
+                isLoadingFiles = false;
+                isTransitioning = false;
             }
-            
-            // 打开侧边栏
-            sidebar.style.display = 'flex';
-            setTimeout(() => {
-                currentSidebarContent = contentType;
-                sidebarOpen = true;
-                enableSidebarButtons();
-            }, 250);
-            
         }, 200);
     } else {
-        // 直接打开侧边栏
-        sidebar.style.display = 'flex';
-        setTimeout(() => {
-            sidebar.classList.add('open');
-            
-            if (contentType === 'satellite') {
-                sidebarSection.style.display = '';
-                sdcardFileList.style.display = 'none';
-            } else if (contentType === 'sdcard') {
-                sidebarSection.style.display = 'none';
-                sdcardFileList.style.display = '';
-                // 显示加载动画
-                sdcardFileList.innerHTML = `
-                    <div class="loading-spinner">
-                        <div class="spinner"></div>
-                    </div>
-                `;
-            }
-            
-            currentSidebarContent = contentType;
-            sidebarOpen = true;
-            enableSidebarButtons();
-        }, 250);
+        isTransitioning = false; // 非SD卡内容直接完成过渡
     }
+    
+    sidebar.classList.add('open');
+    sidebarOpen = true;
+    currentSidebarContent = contentType;
 }
 
 toggleBtn.onclick = () => openSidebar('satellite');
-sdcardBtn.onclick = () => {
-    openSidebar('sdcard');
-    // 拉取SD卡文件
-    fetch('/sdcard_files').then(r => r.json()).then(data => {
-        let files = data.files || [];
-        let html = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px;">SD卡文件</div>`;
-        if (!files.length) {
-            html += `<div style="color:#888;">未发现文件</div>`;
-        } else {
-            html += `<table><tr><th>文件名</th><th style="width:72px;">大小</th></tr>`;
-            for (let f of files) {
-                let size = f.size;
-                if (size > 1e6) size = (size/1e6).toFixed(1) + ' MB';
-                else if (size > 1e3) size = (size/1e3).toFixed(1) + ' KB';
-                else size = size + ' B';
-                html += `<tr><td class="fn" title="${f.name}">${f.name}</td><td>${size}</td></tr>`;
-            }
-            html += `</table>`;
-        }
-        sdcardFileList.innerHTML = html;
-    }).catch(() => {
-    })
-};
+sdcardBtn.onclick = () => openSidebar('sdcard');
 
 // 当侧边栏关闭时，恢复内容
 sidebar.addEventListener('transitionend', function() {
-    if (!sidebar.classList.contains('open')) {
+    if (!sidebar.classList.contains('open') && !isTransitioning) {
         sdcardFileList.style.display = 'none';
         sidebarSection.style.display = '';
         currentSidebarContent = null;
         sidebarOpen = false;
-        enableSidebarButtons();
     }
 });
 
@@ -429,14 +446,22 @@ sidebar.addEventListener('transitionend', function() {
 document.getElementById('locateBtn').onclick = function() {
     if (lastTraceData && lastTraceData.length) {
         let latest = lastTraceData[lastTraceData.length - 1];
-        map.setView([latest.lat, latest.lon], 18, {animate: true});
+        let [lon, lat] = transform.wgs84ToGcj02(latest.lon, latest.lat)
+        map.setView([lat, lon], 18, {animate: true});
         handleLatestLocation(lastTraceData);
     }
 };
 
 // 轨迹显示
 function drawTrack(traceArr) {
-    if (!traceArr || traceArr.length === 0) { if (currentTrack) { trackLayer.removeLayer(currentTrack); currentTrack = null; } return; }
+    if (!traceArr || traceArr.length === 0) { 
+        if (currentTrack) { 
+            trackLayer.removeLayer(currentTrack); 
+            currentTrack = null; 
+        } 
+        return; 
+    }
+    
     let useGaode = map.hasLayer(tileGaode);
     let points = traceArr.map(pt => {
         if (useGaode) {
@@ -446,14 +471,23 @@ function drawTrack(traceArr) {
             return [pt.lat, pt.lon];
         }
     });
+    
     if (currentTrack) trackLayer.removeLayer(currentTrack);
     currentTrack = L.polyline(points, { color: '#ff9800', weight: 4, opacity: 0.8 }).addTo(trackLayer);
-    // 不自动fitBounds，居中逻辑在 handleLatestLocation 控制
+    
+    // 确保地图适应轨迹范围
+    if (points.length > 1) {
+        map.fitBounds(points, { padding: [50, 50] });
+    }
 }
 
 // 定时获取轨迹
-function fetchTrace() {
-    fetch('/trace').then(r => r.json()).then(data => {
+async function fetchTrace() {
+    try {
+        const response = await fetch('/trace');
+        if (!response.ok) throw new Error('Failed to fetch trace');
+        
+        const data = await response.json();
         let traceArr = data.trace || data;
         lastTraceData = traceArr;
         drawTrack(traceArr);
@@ -464,23 +498,34 @@ function fetchTrace() {
         let statusClass = data.in_track ? "recording" : "stopped";
         let distance = data.distance || 0;
         let lengthTxt = `轨迹长度: ${(distance).toFixed(2)} km`;
+        
         document.getElementById('trackStatus').textContent = status;
         document.getElementById('trackStatus').className = `status ${statusClass}`;
         document.getElementById('trackLength').textContent = lengthTxt;
-    }).catch(()=>{});
+    } catch (error) {
+        console.error('Error fetching trace:', error);
+    }
 }
+
 setInterval(fetchTrace, 5000);
 fetchTrace();
 
 // ------ 卫星信息相关 ------
-function fetchSatellites() {
-    fetch('/satellites').then(r => r.json()).then(data => {
+async function fetchSatellites() {
+    try {
+        const response = await fetch('/satellites');
+        if (!response.ok) throw new Error('Failed to fetch satellites');
+        
+        const data = await response.json();
         let sats = data.satellites || [];
         renderPolarPlot(sats);
         renderSnrBar(sats);
         renderSatList(sats);
-    }).catch(()=>{});
+    } catch (error) {
+        console.error('Error fetching satellites:', error);
+    }
 }
+
 setInterval(fetchSatellites, 2000);
 fetchSatellites();
 

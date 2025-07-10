@@ -5,6 +5,7 @@
 
 #include "gnss_state.h"
 #include "utils/json.hpp"
+#include "utils/lock.hpp"
 
 #ifndef TRACESTATE
 #define TRACESTATE
@@ -42,7 +43,6 @@ public:
         closed = true;
         fp = nullptr;
         current_trace = nlohmann::json::array();
-        mutex = xSemaphoreCreateMutex();
     };
     ~Trace() = default;
 
@@ -66,13 +66,12 @@ public:
 
     void try_close_trace();
     int get_duration_ms();
-    bool lock();
-    bool unlock();
 
+    RWlock mutex;
 private:
-    SemaphoreHandle_t mutex;
     WayPoint last_point;
     nlohmann::json current_trace;
+    std::string file_name;
     std::chrono::system_clock::time_point start_time;
     int64_t local_start_time_ms;
     double distance;

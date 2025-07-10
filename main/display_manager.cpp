@@ -98,11 +98,11 @@ void DisplayManager::updateDisplay(Context &context) {
     }
 
     oled.clear();
-    context.gnss_state.lock();
+    context.gnss_state.mutex.lock_read();
     main_page->render(context, oled);
     for (int i = 0; i < side_pages.size(); i++) {
         side_pages[i]->render(context, oled);
     }
-    context.gnss_state.unlock();
+    context.gnss_state.mutex.unlock_read();
     oled.refresh(true);
 }

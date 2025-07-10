@@ -191,11 +191,11 @@ extern "C" void app_main() {
             vTaskDelay(pdMS_TO_TICKS(10));
         }
 
-        context.gnss_state.lock();
+        context.gnss_state.mutex.lock_read();
         if (context.enable_track && context.fresh_cnt == 0 && context.gnss_state.valid) { // every second
             trace_state.add_waypoint(context.gnss_state);
         }
-        context.gnss_state.unlock();
+        context.gnss_state.mutex.unlock_read();
 
         if (!context.enable_track) {
             trace_state.try_close_trace();
