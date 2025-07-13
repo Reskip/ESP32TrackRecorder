@@ -6,7 +6,7 @@
 #include "status/trace_state.h"
 #include "utils/utils.h"
 
-#define SAMPLE_RATE 5
+#define SAMPLE_RATE 10
 #define SAVE_FILE_RATE 30
 
 WayPoint::WayPoint(GNSSState &gnss_state) {

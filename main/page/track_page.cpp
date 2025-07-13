@@ -16,7 +16,13 @@ void TrackPage::render_expand(Context &context, OLED &oled) {
     std::ostringstream tracker_stream;
     tracker_stream << "POINT " << context.trace_state.get_waypoint_size();
     std::ostringstream distance_stream;
-    distance_stream << "DIST  " << std::fixed << std::setprecision(2) << context.trace_state.get_distance() << " KM";
+    distance_stream << std::fixed << std::setprecision(2) << context.trace_state.get_distance();
+    std::string distance_fixed = distance_stream.str().substr(0, 5);
+    if (distance_fixed[distance_fixed.size() - 1] == '.') {
+        distance_fixed = distance_fixed.substr(0, distance_fixed.size() - 1);
+    }
+    distance_stream.str("");
+    distance_stream << "DIST  " << distance_fixed << " KM";
     std::ostringstream duration_stream;
     uint64_t duration_ms = 0;
     if (context.enable_track) {

@@ -22,7 +22,12 @@ private:
                              int32_t event_id, void* event_data);
     
     static esp_err_t root_handler(httpd_req_t *req);
-    static esp_err_t trace_handler(httpd_req_t *req);
+    static esp_err_t trace_full_handler(httpd_req_t *req);
+    static esp_err_t trace_recent_handler(httpd_req_t *req);
+    static esp_err_t satellites_get_handler(httpd_req_t *req);
+    static esp_err_t sdcard_files_handler(httpd_req_t *req);
+    static esp_err_t download_file_handler(httpd_req_t *req);
+
     void register_uri_handlers();
     esp_err_t start_webserver();
     

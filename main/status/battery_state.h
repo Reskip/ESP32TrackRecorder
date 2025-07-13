@@ -23,8 +23,8 @@ public:
     void update_all_status();
 
     gpio_num_t scl, sda, charging;
-    float voltage, soc;
-    int in_charging;
+    float voltage_, soc_;
+    int charging_;
     int request_cache_cnt;
 };
 

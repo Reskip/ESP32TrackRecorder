@@ -64,6 +64,22 @@ public:
         return current_trace;
     }
 
+    nlohmann::json get_last_waypoints() const {
+        nlohmann::json response = nlohmann::json::array();
+        if (closed) {
+            return response;
+        }
+        nlohmann::json last_point_json = {
+            {"lat", last_point.latitude},
+            {"lon", last_point.longitude},
+            {"alt", *(last_point.elevation)},
+            {"speed", *(last_point.speed)},
+            {"hdop", *(last_point.hdop)}
+        };
+        response.push_back(last_point_json);
+        return response;
+    }
+
     void try_close_trace();
     int get_duration_ms();
 

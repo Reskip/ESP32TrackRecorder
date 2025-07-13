@@ -30,13 +30,16 @@ esp_err_t WebManager::root_handler(httpd_req_t *req) {
     return httpd_resp_send(req, html, HTTPD_RESP_USE_STRLEN);
 }
 
-esp_err_t WebManager::trace_handler(httpd_req_t *req) {
+esp_err_t WebManager::trace_full_handler(httpd_req_t *req) {
     Context *context_ptr = (Context*) req->user_ctx;
     context_ptr->trace_state.mutex.lock_read();
-   nlohmann::json trace_response = {
+    context_ptr->gnss_state.mutex.lock_read();
+    nlohmann::json trace_response = {
         {"in_track", context_ptr->enable_track},
-        {"distance", context_ptr->trace_state.get_distance()}
+        {"distance", context_ptr->trace_state.get_distance()},
+        {"speed", context_ptr->gnss_state.ground_speed}
     };
+    context_ptr->gnss_state.mutex.unlock_read();
     trace_response["trace"] = context_ptr->trace_state.get_waypoints();
     context_ptr->trace_state.mutex.unlock_read();
 
@@ -44,7 +47,24 @@ esp_err_t WebManager::trace_handler(httpd_req_t *req) {
     return httpd_resp_send(req, trace_response.dump(4).c_str(), HTTPD_RESP_USE_STRLEN);
 }
 
-esp_err_t satellites_get_handler(httpd_req_t *req) {
+esp_err_t WebManager::trace_recent_handler(httpd_req_t *req) {
+    Context *context_ptr = (Context*) req->user_ctx;
+    context_ptr->trace_state.mutex.lock_read();
+    context_ptr->gnss_state.mutex.lock_read();
+    nlohmann::json trace_response = {
+        {"in_track", context_ptr->enable_track},
+        {"distance", context_ptr->trace_state.get_distance()},
+        {"speed", context_ptr->gnss_state.ground_speed}
+    };
+    context_ptr->gnss_state.mutex.unlock_read();
+    trace_response["trace"] = context_ptr->trace_state.get_last_waypoints();
+    context_ptr->trace_state.mutex.unlock_read();
+
+    httpd_resp_set_type(req, "application/json");
+    return httpd_resp_send(req, trace_response.dump(4).c_str(), HTTPD_RESP_USE_STRLEN);
+}
+
+esp_err_t WebManager::satellites_get_handler(httpd_req_t *req) {
     Context *context_ptr = (Context*) req->user_ctx;
     nlohmann::json satellites_response;
     satellites_response["satellites"] = nlohmann::json::array();
@@ -67,7 +87,7 @@ esp_err_t satellites_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-esp_err_t sdcard_files_handler(httpd_req_t *req) {
+esp_err_t WebManager::sdcard_files_handler(httpd_req_t *req) {
     nlohmann::json jresp;
     jresp["files"] = nlohmann::json::array();
 
@@ -88,7 +108,7 @@ esp_err_t sdcard_files_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
-esp_err_t download_file_handler(httpd_req_t *req) {
+esp_err_t WebManager::download_file_handler(httpd_req_t *req) {
     char query_str[256];
     if (httpd_req_get_url_query_str(req, query_str, sizeof(query_str)) != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing query string");
@@ -183,13 +203,21 @@ void WebManager::register_uri_handlers() {
     };
     httpd_register_uri_handler(server, &uri);
     
-    httpd_uri_t trace_uri = {
-        .uri = "/trace",
+    httpd_uri_t trace_full_uri = {
+        .uri = "/trace_full",
         .method = HTTP_GET,
-        .handler = trace_handler,
+        .handler = trace_full_handler,
         .user_ctx = context_ptr,
     };
-    httpd_register_uri_handler(server, &trace_uri);
+    httpd_register_uri_handler(server, &trace_full_uri);
+
+    httpd_uri_t trace_recent_uri = {
+        .uri = "/trace_recent",
+        .method = HTTP_GET,
+        .handler = trace_recent_handler,
+        .user_ctx = context_ptr,
+    };
+    httpd_register_uri_handler(server, &trace_recent_uri);
 
     httpd_uri_t satellites_uri = {
         .uri = "/satellites",

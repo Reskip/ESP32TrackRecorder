@@ -15,7 +15,7 @@
 SettingPage::SettingPage()
     : SidebarPage("SettingPage", (char*) setting_icon) {
 
-    Button light_btn(Button::SCROLL, "LIGHT", 0, Y_MARGIN + 2);
+    Button light_btn(Button::SCROLL, "LIGHT", 0, Y_MARGIN + 0);
     light_btn.configure_scroll({"HIGH", "MID", "LOW"}, {0xff, 0x7f, 0x01}, 1);
     light_btn.set_callback([](Button* btn, Context* context) {
         context->brightness = btn->get_scroll_state();

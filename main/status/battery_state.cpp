@@ -47,9 +47,9 @@ bool Battery::init() {
     io_conf.pin_bit_mask = (1ULL << charging);
     gpio_config(&io_conf);
 
-    voltage = 0;
-    soc = 0;
-    in_charging = false;
+    voltage_ = 0;
+    soc_ = 0;
+    charging_ = false;
     request_cache_cnt = REQUEST_CACHE;
     return true;
 }
@@ -62,29 +62,35 @@ void Battery::update_all_status() {
     request_cache_cnt = 0;
     uint16_t raw_value;
 
-    if (!read_register(VCELL_REG, &raw_value)) voltage = -1.0;
-    voltage = (raw_value >> 4) * 0.00125;
+    if (!read_register(VCELL_REG, &raw_value)) {
+        voltage_ = -1.0;
+    } else {
+        voltage_ = (raw_value >> 4) * 0.00125;
+    }
 
-    if (!read_register(SOC_REG, &raw_value)) soc = -1.0;
-    soc = raw_value / 256.0;
+    if (!read_register(SOC_REG, &raw_value)) {
+        soc_ = -1.0;
+    } else {
+        soc_ = raw_value / 256.0;
+    }
 
-    in_charging = !gpio_get_level(charging);
+    charging_ = !gpio_get_level(charging);
     return;
 }
 
 float Battery::read_voltage() {
     update_all_status();
-    return voltage;
+    return voltage_;
 }
 
 float Battery::read_soc() {
     update_all_status();
-    return soc;
+    return soc_;
 }
 
 bool Battery::is_charging() {
     update_all_status();
-    return charging;
+    return charging_;
 }
 
 bool Battery::read_register(uint8_t reg, uint16_t *value) const {
@@ -109,8 +115,8 @@ bool Battery::read_register(uint8_t reg, uint16_t *value) const {
 }
 
 void Battery::print_debug_info() {
-    float voltage = read_voltage();
-    float soc = read_soc();
-    int charging = is_charging();
-    ESP_LOGI(BATTERY_TAG, "Voltage: %.3f V, SOC: %.1f%%, Charging: %d", voltage, soc, charging);
+    float voltage_ = read_voltage();
+    float soc_ = read_soc();
+    int charging_ = is_charging();
+    ESP_LOGI(BATTERY_TAG, "Voltage: %.3f V, SOC: %.1f%%, Charging: %d", voltage_, soc_, charging_);
 }

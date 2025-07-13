@@ -182,6 +182,7 @@ const char *html = R"(
     <div class="infobar" id="infobar">
       <span id="trackStatus"></span>
       <span id="trackLength"></span>
+      <span id="currentSpeed"></span>
     </div>
     <button class="sidebar-toggle-btn" id="sidebarToggle" title="卫星信息">&#9776;</button>
     <button class="sdcard-btn" id="sdcardBtn" title="SD卡文件">&#128190;</button>
@@ -209,6 +210,31 @@ function satTypeInfo(type) {
     if (type.startsWith("GL")) return { label: "格洛纳斯", color: "#2196f3" };  // 蓝
     if (type.startsWith("GB")) return { label: "北斗", color: "#43a047" };      // 绿
     return { label: "其它", color: "#bdbdbd" };                                 // 灰
+}
+
+// 卫星系统排序权重
+function getSatSystemWeight(type) {
+    if (type.startsWith("GP")) return 1; // GPS
+    if (type.startsWith("GL")) return 2; // 格洛纳斯
+    if (type.startsWith("GB")) return 3; // 北斗
+    return 4; // 其它
+}
+
+// 排序卫星数据：先按系统类型，再按SNR
+function sortSatellites(sats) {
+    return [...sats].sort((a, b) => {
+        const systemA = getSatSystemWeight(a.type);
+        const systemB = getSatSystemWeight(b.type);
+        
+        if (systemA !== systemB) {
+            return systemA - systemB; // 系统类型排序
+        }
+        
+        // 相同系统内按SNR降序排列
+        const snrA = a.snr || 0;
+        const snrB = b.snr || 0;
+        return snrB - snrA;
+    });
 }
 
 // 地图与轨迹相关
@@ -242,6 +268,7 @@ const transform = {
 let firstLocate = true;
 let lastUserAction = Date.now();
 let lastLocatedPoint = null;
+let lastPositionCoords = null;
 
 // 监听用户地图操作（拖动/缩放等行为）
 function setupMapActionListener() {
@@ -258,6 +285,10 @@ function handleLatestLocation(traceArr) {
     let latest = traceArr[traceArr.length - 1];
     let latestCoord = latest.lat + ',' + latest.lon;
 
+    // 检查是否有新的定位点
+    const hasNewPosition = lastPositionCoords !== latestCoord;
+    lastPositionCoords = latestCoord;
+
     // 第一次定位自动居中
     if (firstLocate) {
         let [lon, lat] = transform.wgs84ToGcj02(latest.lon, latest.lat)
@@ -266,9 +297,11 @@ function handleLatestLocation(traceArr) {
         firstLocate = false;
         return;
     }
-    // 10秒无操作且有新定位
-    if (Date.now() - lastUserAction > 10000 && lastLocatedPoint !== latestCoord) {
-        map.panTo([latest.lat, latest.lon]);
+
+    // 10秒无操作且有新定位点时才自动定位
+    if ((Date.now() - lastUserAction) > 10000 && hasNewPosition) {
+        let [lon, lat] = transform.wgs84ToGcj02(latest.lon, latest.lat)
+        map.panTo([lat, lon]);
         lastLocatedPoint = latestCoord;
     }
 }
@@ -473,42 +506,78 @@ function drawTrack(traceArr) {
     });
     
     if (currentTrack) trackLayer.removeLayer(currentTrack);
-    currentTrack = L.polyline(points, { color: '#ff9800', weight: 4, opacity: 0.8 }).addTo(trackLayer);
-    
-    // 确保地图适应轨迹范围
-    if (points.length > 1) {
-        map.fitBounds(points, { padding: [50, 50] });
-    }
+    currentTrack = L.polyline(points, { color: '#2196f3', weight: 4, opacity: 0.8 }).addTo(trackLayer);
 }
 
-// 定时获取轨迹
-async function fetchTrace() {
+// 检查两个点是否相同
+function isSamePoint(p1, p2) {
+    return p1 && p2 && 
+           p1.lat === p2.lat && 
+           p1.lon === p2.lon;
+}
+
+// 第一次加载时获取全量轨迹
+async function fetchFullTrace() {
     try {
-        const response = await fetch('/trace');
-        if (!response.ok) throw new Error('Failed to fetch trace');
+        const response = await fetch('/trace_full');
+        if (!response.ok) throw new Error('Failed to fetch full trace');
         
         const data = await response.json();
         let traceArr = data.trace || data;
-        lastTraceData = traceArr;
-        drawTrack(traceArr);
-        handleLatestLocation(traceArr); // 定位逻辑
+        lastTraceData = [...traceArr];
+        drawTrack(lastTraceData);
+        handleLatestLocation(lastTraceData); // 定位逻辑
 
         // 更新轨迹状态与长度
-        let status = data.in_track ? "记录中" : "未在记录";
-        let statusClass = data.in_track ? "recording" : "stopped";
-        let distance = data.distance || 0;
-        let lengthTxt = `轨迹长度: ${(distance).toFixed(2)} km`;
-        
-        document.getElementById('trackStatus').textContent = status;
-        document.getElementById('trackStatus').className = `status ${statusClass}`;
-        document.getElementById('trackLength').textContent = lengthTxt;
+        updateTrackInfo(data);
     } catch (error) {
-        console.error('Error fetching trace:', error);
+        console.error('Error fetching full trace:', error);
     }
 }
 
-setInterval(fetchTrace, 5000);
-fetchTrace();
+// 更新轨迹信息
+function updateTrackInfo(data) {
+    let status = data.in_track ? "记录中" : "未在记录";
+    let statusClass = data.in_track ? "recording" : "stopped";
+    let distance = data.distance || 0;
+    let lengthTxt = `轨迹长度: ${(distance).toFixed(2)} km`;
+    let speed = data.speed || 0;
+    let speedTxt = `当前速度: ${speed.toFixed(1)} km/h`;
+    
+    document.getElementById('trackStatus').textContent = status;
+    document.getElementById('trackStatus').className = `status ${statusClass}`;
+    document.getElementById('trackLength').textContent = lengthTxt;
+    document.getElementById('currentSpeed').textContent = speedTxt;
+}
+
+// 定时获取最新轨迹点
+async function fetchRecentTrace() {
+    try {
+        const response = await fetch('/trace_recent');
+        if (!response.ok) throw new Error('Failed to fetch recent trace');
+        
+        const data = await response.json();
+        let newPoints = data.trace || [];
+        
+        // 只添加新的点
+        if (newPoints.length > 0 && !isSamePoint(newPoints[0], lastTraceData[lastTraceData.length - 1])) {
+            lastTraceData = [...lastTraceData, ...newPoints];
+            drawTrack(lastTraceData);
+            handleLatestLocation(lastTraceData);
+        }
+
+        // 更新轨迹状态与长度
+        updateTrackInfo(data);
+    } catch (error) {
+        console.error('Error fetching recent trace:', error);
+    }
+}
+
+// 第一次加载时获取全量轨迹
+fetchFullTrace();
+
+// 之后每隔2秒获取最新轨迹点
+setInterval(fetchRecentTrace, 2000);
 
 // ------ 卫星信息相关 ------
 async function fetchSatellites() {
@@ -518,15 +587,19 @@ async function fetchSatellites() {
         
         const data = await response.json();
         let sats = data.satellites || [];
-        renderPolarPlot(sats);
-        renderSnrBar(sats);
-        renderSatList(sats);
+        
+        // 排序卫星数据
+        const sortedSats = sortSatellites(sats);
+        
+        renderPolarPlot(sortedSats);
+        renderSnrBar(sortedSats);
+        renderSatList(sortedSats);
     } catch (error) {
         console.error('Error fetching satellites:', error);
     }
 }
 
-setInterval(fetchSatellites, 2000);
+setInterval(fetchSatellites, 3000);
 fetchSatellites();
 
 // 极坐标图
