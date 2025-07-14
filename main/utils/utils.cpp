@@ -37,6 +37,13 @@ void init_gpx(FILE *fp) {
     fprintf(fp, header);
 }
 
+void new_track_seg(FILE *fp) {
+    const char* header = R"(        </trkseg>
+        <trkseg>
+)";
+    fprintf(fp, header);
+}
+
 void close_gpx(FILE *fp) {
     const char* header = R"(        </trkseg>
     </trk>

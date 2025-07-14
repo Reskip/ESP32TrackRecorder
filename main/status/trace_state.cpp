@@ -8,6 +8,8 @@
 
 #define SAMPLE_RATE 10
 #define SAVE_FILE_RATE 30
+#define MOUNT_POINT "/spiflash"
+#define CUT_SEG_TIME_DIFF 10
 
 WayPoint::WayPoint(GNSSState &gnss_state) {
     latitude = gnss_state.latitude;
@@ -74,6 +76,8 @@ std::string WayPoint::to_gpx_string() const {
 
 void Trace::add_waypoint(GNSSState &gnss_state) {
     WayPoint waypoint(gnss_state);
+    int64_t update_time_diff_ms = 0;
+    int64_t current_time_ms = esp_timer_get_time() / 1000;
 
     mutex.lock_write();
 
@@ -87,7 +91,8 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
         last_point = waypoint;
         char time_str[50];
 
-        local_start_time_ms = esp_timer_get_time() / 1000;
+        local_start_time_ms = current_time_ms;
+        last_update_time_ms = current_time_ms;
         auto time_t = std::chrono::system_clock::to_time_t(start_time);
         std::tm* tm = std::gmtime(&time_t);
         std::strftime(time_str, sizeof(time_str), "/%Y-%m-%dT%H-%M-%S.GPX", tm);
@@ -102,6 +107,12 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
         );
         distance += _distance;
         last_point = waypoint;
+        update_time_diff_ms = current_time_ms - last_update_time_ms;
+        last_update_time_ms = current_time_ms;
+    }
+
+    if (update_time_diff_ms > 1000 * CUT_SEG_TIME_DIFF) {
+        new_track_seg(fp);
     }
 
     fprintf(fp, "           %s\n", waypoint.to_gpx_string().c_str());

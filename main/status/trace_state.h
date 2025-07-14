@@ -11,7 +11,6 @@
 #define TRACESTATE
 
 #define TRACE_TAG "TraceState"
-#define MOUNT_POINT "/spiflash"
 
 struct WayPoint {
     double latitude;
@@ -40,6 +39,7 @@ public:
         distance = 0.0;
         sample_cnt = 0;
         local_start_time_ms = 0;
+        last_update_time_ms = 0;
         closed = true;
         fp = nullptr;
         current_trace = nlohmann::json::array();
@@ -90,6 +90,7 @@ private:
     std::string file_name;
     std::chrono::system_clock::time_point start_time;
     int64_t local_start_time_ms;
+    int64_t last_update_time_ms;
     double distance;
     int sample_cnt;
     bool closed;

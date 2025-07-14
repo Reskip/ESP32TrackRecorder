@@ -95,10 +95,16 @@ esp_err_t WebManager::sdcard_files_handler(httpd_req_t *req) {
 
     for (const auto& entry : std::filesystem::directory_iterator(sd_path)) {
         if (entry.is_regular_file()) {
-            nlohmann::json jfile;
-            jfile["name"] = entry.path().filename().string();
-            jfile["size"] = entry.file_size();
-            jresp["files"].push_back(jfile);
+            const std::string filename = entry.path().filename().string();
+            const size_t ext_pos = filename.rfind('.');
+
+            if (ext_pos != std::string::npos && 
+                filename.substr(ext_pos) == ".GPX") {
+                nlohmann::json jfile;
+                jfile["name"] = filename;
+                jfile["size"] = entry.file_size();
+                jresp["files"].push_back(jfile);
+            }
         }
     }
 
@@ -169,6 +175,34 @@ esp_err_t WebManager::download_file_handler(httpd_req_t *req) {
         return ESP_OK;
     }
     return ESP_FAIL;
+}
+
+esp_err_t WebManager::delete_file_handler(httpd_req_t *req) {
+    char query_str[256];
+    if (httpd_req_get_url_query_str(req, query_str, sizeof(query_str)) != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing query string");
+        return ESP_FAIL;
+    }
+    ESP_LOGI(WEB_TAG, "query delete file %s", query_str);
+
+    const char* file_param = strstr(query_str, "file=");
+    if (!file_param) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'file' parameter");
+        return ESP_FAIL;
+    }
+    
+    std::string file_name = urlDecode(file_param + 5);
+    std::string file_path = MOUNT_POINT + std::string("/") + file_name;
+    ESP_LOGI(WEB_TAG, "try delete file %s %s", file_name.c_str(), file_path.c_str());
+
+    if (std::filesystem::remove(file_path)) {
+        httpd_resp_set_type(req, "application/json");
+        nlohmann::json response = {{"status", "success"}, {"message", "File deleted successfully"}};
+        return httpd_resp_send(req, response.dump(4).c_str(), HTTPD_RESP_USE_STRLEN);
+    } else {
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "File not found or could not be deleted");
+        return ESP_FAIL;
+    }
 }
 
 void WebManager::event_handler(void* arg, esp_event_base_t event_base,
@@ -242,6 +276,14 @@ void WebManager::register_uri_handlers() {
         .user_ctx  = context_ptr
     };
     httpd_register_uri_handler(server, &download_file_uri);
+
+    httpd_uri_t delete_file_uri = {
+        .uri       = "/delete",
+        .method    = HTTP_GET,
+        .handler   = delete_file_handler,
+        .user_ctx  = context_ptr
+    };
+    httpd_register_uri_handler(server, &delete_file_uri);
 }
 
 esp_err_t WebManager::start_webserver() {

@@ -27,6 +27,7 @@ private:
     static esp_err_t satellites_get_handler(httpd_req_t *req);
     static esp_err_t sdcard_files_handler(httpd_req_t *req);
     static esp_err_t download_file_handler(httpd_req_t *req);
+    static esp_err_t delete_file_handler(httpd_req_t *req);
 
     void register_uri_handlers();
     esp_err_t start_webserver();

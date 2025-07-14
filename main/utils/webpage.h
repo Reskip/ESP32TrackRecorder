@@ -15,12 +15,12 @@ const char *html = R"(
         body { font-family: 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif; }
         #map { height: 100vh; width: 100vw; position: absolute; top: 0; left: 0; z-index: 1; }
         .sidebar {
-            position: absolute; top: 0; right: 0; height: 100vh; width: 320px; background: rgba(255,255,255,0.96);
+            position: absolute; top: 0; right: 0; height: 100vh; width: 25%; min-width: 320px; max-width: 480px; background: rgba(255,255,255,0.96);
             box-shadow: -2px 0 10px 0 rgba(0,0,0,0.12); z-index: 30;
             transform: translateX(100%);
-            transition: transform 0.25s ease-out; /* 恢复滑动特效 */
+            transition: transform 0.25s ease-out;
             flex-direction: column;
-            display: flex; /* 改为始终显示，通过transform控制可见性 */
+            display: flex;
         }
         .sidebar.open {
             transform: translateX(0);
@@ -87,7 +87,7 @@ const char *html = R"(
         .tile-switcher, .infobar {
             position: absolute;
             left: 18px;
-            margin: 10px 0; /* 增加上下margin */
+            margin: 10px 0;
         }
         .tile-switcher { top: 18px; z-index: 20; background: #fff; border-radius: 18px; box-shadow: 0 2px 6px #0002; padding: 4px 10px; }
         .tile-switcher button { background: none; border: none; font-size: 15px; color: #333; margin-right: 10px; cursor: pointer; }
@@ -108,15 +108,15 @@ const char *html = R"(
             justify-content: center; 
             cursor: pointer;
             transition: all 0.2s ease;
-            touch-action: manipulation; /* 防止双击放大 */
-            margin: 10px 0; /* 增加上下margin */
+            touch-action: manipulation;
+            margin: 10px 0;
         }
         .sidebar-toggle-btn:hover, .sdcard-btn:hover, .locate-btn:hover {
             transform: scale(1.08);
         }
-        .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); z-index: 40; } /* 调整顶部位置 */
-        .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); z-index: 41; } /* 调整顶部位置 */
-        .locate-btn { bottom: env(safe-area-inset-bottom, 34px); z-index: 41; } /* 调整底部位置 */
+        .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); z-index: 40; }
+        .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); z-index: 41; }
+        .locate-btn { bottom: env(safe-area-inset-bottom, 34px); z-index: 41; }
         /* SD卡文件列表样式 */
         .sdcard-file-list {
             background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001;
@@ -124,7 +124,6 @@ const char *html = R"(
         }
         .sdcard-file-list table { width: 100%; border-collapse: collapse; }
         .sdcard-file-list th, .sdcard-file-list td { padding: 4px 6px; text-align: left; white-space: nowrap; }
-        .sdcard-file-list .fn { max-width: 160px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom;}
         .infobar {
             top: calc(env(safe-area-inset-top, 28px) + 52px); z-index: 21;
             background: #fff; border-radius: 8px; box-shadow: 0 2px 6px #0002;
@@ -145,6 +144,93 @@ const char *html = R"(
             .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); }
             .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); }
             .locate-btn { bottom: env(safe-area-inset-bottom, 34px); }
+        }
+        /* 文件操作模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 100;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 300px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            position: relative;
+        }
+        .modal-header {
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 16px;
+            word-break: break-all;
+            max-width: 100%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .modal-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            transition: all 0.3s ease;
+        }
+        .btn-action {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-action:hover {
+            opacity: 0.9;
+        }
+        .btn-danger {
+            background-color: #f44336;
+            color: white;
+        }
+        .warning-text {
+            color: #f44336;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .delete-confirm {
+            display: none;
+            margin-top: 15px;
+        }
+        .file-item {
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            margin: 2px 0;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            color: #333;
+            text-align: left;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: middle;
+        }
+        .file-item:hover {
+            background-color: #e0e0e0;
+            border-color: #bbb;
+        }
+        .file-item:active {
+            background-color: #d0d0d0;
         }
         /* 加载动画 */
         .loading-spinner {
@@ -169,6 +255,43 @@ const char *html = R"(
         .sidebar-toggle-btn.disabled, .sdcard-btn.disabled {
             opacity: 0.6;
             pointer-events: none;
+        }
+        /* 新增样式 */
+        .file-action-message {
+            margin-top: 15px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            text-align: center;
+            display: none;
+            transition: all 0.3s ease;
+        }
+        .message-success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .message-error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .message-loading {
+            background-color: #f8f9fa;
+            color: #6c757d;
+        }
+        .return-btn {
+            display: none;
+            margin-top: 15px;
+            width: 100%;
+            padding: 8px 16px;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .return-btn:hover {
+            background-color: #5a6268;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -202,6 +325,27 @@ const char *html = R"(
             </div>
         </div>
     </div>
+    
+    <!-- 文件操作模态框 -->
+    <div id="fileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" id="modalFileName">文件操作</div>
+            <div class="modal-actions" id="modalActions">
+                <button id="downloadBtn" class="btn-action">下载</button>
+                <button id="deleteBtn" class="btn-action btn-danger">删除</button>
+            </div>
+            <div id="deleteConfirm" class="delete-confirm" style="display: none;">
+                <p class="warning-text">确定要删除这个文件吗？</p>
+                <div class="modal-actions">
+                    <button id="confirmDeleteBtn" class="btn-action btn-danger">确认删除</button>
+                    <button id="cancelDeleteBtn" class="btn-action">取消</button>
+                </div>
+            </div>
+            <div id="fileActionMessage" class="file-action-message"></div>
+            <button id="returnBtn" class="return-btn">返回</button>
+        </div>
+    </div>
+    
 <script>
 // 卫星类型与配色
 function satTypeInfo(type) {
@@ -379,12 +523,76 @@ function waitForTransition(element) {
     });
 }
 
+function updateSdcardPage() {
+    sdcardFileList.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+        </div>
+    `;
+
+    setTimeout(async () => {
+        isLoadingFiles = true;
+        try {
+            const response = await fetch('/sdcard_files');
+            if (!response.ok) throw new Error('Failed to fetch files');
+            
+            const data = await response.json();
+            let files = data.files || [];
+            let html = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px;">SD卡文件</div>`;
+            
+            if (!files.length) {
+                html += `<div style="color:#888;">未发现文件</div>`;
+            } else {
+                html += `<table><tr><th>文件名</th><th style="width:72px;">大小</th></tr>`;
+                for (let f of files) {
+                    let size = f.size;
+                    if (size > 1e6) size = (size/1e6).toFixed(1) + ' MB';
+                    else if (size > 1e3) size = (size/1e3).toFixed(1) + ' KB';
+                    else size = size + ' B';
+                    html += `<tr>
+                        <td>
+                            <button type="button" class="file-item" data-file="${f.name}" title="${f.name}">
+                                ${f.name}
+                            </button>
+                        </td>
+                        <td>${size}</td>
+                    </tr>`;
+                }
+                html += `</table>`;
+            }
+
+            sdcardFileList.innerHTML = html;
+
+            setTimeout(() => {
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.addEventListener('click', function() {
+                        const fileName = this.getAttribute('data-file');
+                        document.getElementById('modalFileName').textContent = fileName;
+                        resetFileModal();
+                        document.getElementById('fileModal').style.display = 'block';
+                    });
+                });
+            }, 100);
+        } catch (error) {
+            console.error('Error loading SD card files:', error);
+            sdcardFileList.innerHTML = `
+                <div style="color:red; text-align:center; padding:20px;">
+                    加载文件失败，请重试
+                </div>
+            `;
+        } finally {
+            isLoadingFiles = false;
+            isTransitioning = false;
+        }
+    }, 200);
+}
+
 async function openSidebar(contentType) {
     // 如果正在过渡或正在加载文件，不执行任何操作
     if (isTransitioning || (contentType === 'sdcard' && isLoadingFiles)) return;
-    
-    isTransitioning = true; // 只设置过渡状态，不禁用按钮
-    
+
+    isTransitioning = true;
+
     if (currentSidebarContent === contentType) {
         // 关闭当前侧边栏
         sidebar.classList.remove('open');
@@ -402,57 +610,13 @@ async function openSidebar(contentType) {
         sidebar.classList.remove('open');
         await waitForTransition(sidebar);
     }
-    
+
     // 切换内容
     sidebarSection.style.display = contentType === 'satellite' ? '' : 'none';
     sdcardFileList.style.display = contentType === 'sdcard' ? '' : 'none';
-    
-    // 如果是加载SD卡文件，显示加载动画并异步加载
+
     if (contentType === 'sdcard') {
-        sdcardFileList.innerHTML = `
-            <div class="loading-spinner">
-                <div class="spinner"></div>
-            </div>
-        `;
-        
-        // 延迟加载，确保动画显示
-        setTimeout(async () => {
-            isLoadingFiles = true;
-            try {
-                const response = await fetch('/sdcard_files');
-                if (!response.ok) throw new Error('Failed to fetch files');
-                
-                const data = await response.json();
-                let files = data.files || [];
-                let html = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px;">SD卡文件</div>`;
-                
-                if (!files.length) {
-                    html += `<div style="color:#888;">未发现文件</div>`;
-                } else {
-                    html += `<table><tr><th>文件名</th><th style="width:72px;">大小</th></tr>`;
-                    for (let f of files) {
-                        let size = f.size;
-                        if (size > 1e6) size = (size/1e6).toFixed(1) + ' MB';
-                        else if (size > 1e3) size = (size/1e3).toFixed(1) + ' KB';
-                        else size = size + ' B';
-                        html += `<tr><td class="fn" title="${f.name}"><a href="/download?file=${f.name}" download>${f.name}</a></td><td>${size}</td></tr>`;
-                    }
-                    html += `</table>`;
-                }
-                
-                sdcardFileList.innerHTML = html;
-            } catch (error) {
-                console.error('Error loading SD card files:', error);
-                sdcardFileList.innerHTML = `
-                    <div style="color:red; text-align:center; padding:20px;">
-                        加载文件失败，请重试
-                    </div>
-                `;
-            } finally {
-                isLoadingFiles = false;
-                isTransitioning = false;
-            }
-        }, 200);
+        updateSdcardPage();
     } else {
         isTransitioning = false; // 非SD卡内容直接完成过渡
     }
@@ -693,6 +857,102 @@ function renderSatList(sats) {
     html += `</table>`;
     document.getElementById('satList').innerHTML = html;
 }
+
+let currentFileName = '';
+
+function resetFileModal() {
+    document.getElementById('modalActions').style.display = 'flex';
+    document.getElementById('deleteConfirm').style.display = 'none';
+    document.getElementById('fileActionMessage').style.display = 'none';
+    document.getElementById('returnBtn').style.display = 'none';
+}
+
+function showFileActionMessage(message, type) {
+    const messageElement = document.getElementById('fileActionMessage');
+    const actionsElement = document.getElementById('modalActions');
+    const deleteConfirmElement = document.getElementById('deleteConfirm');
+    
+    messageElement.textContent = message;
+    messageElement.className = 'file-action-message';
+    
+    if (type === 'success') {
+        messageElement.classList.add('message-success');
+    } else if (type === 'error') {
+        messageElement.classList.add('message-error');
+    } else if (type === 'loading') {
+        messageElement.classList.add('message-loading');
+    }
+    
+    // 隐藏按钮，显示状态信息
+    actionsElement.style.display = 'none';
+    deleteConfirmElement.style.display = 'none';
+    messageElement.style.display = 'block';
+    document.getElementById('returnBtn').style.display = 'block';
+}
+
+function downloadFile() {
+    currentFileName = document.getElementById('modalFileName').textContent;
+    showFileActionMessage('准备下载文件...', 'loading');
+    
+    setTimeout(() => {
+        window.location.href = `/download?file=${encodeURIComponent(currentFileName)}`;
+        showFileActionMessage('已开始下载文件', 'success');
+    }, 500);
+}
+
+async function deleteFile() {
+    currentFileName = document.getElementById('modalFileName').textContent;
+    showFileActionMessage('正在删除文件...', 'loading');
+    
+    try {
+        const response = await fetch(`/delete?file=${encodeURIComponent(currentFileName)}`);
+        
+        if (!response.ok) {
+            throw new Error('删除文件失败');
+        }
+        
+        await response.json();
+        showFileActionMessage('文件已成功删除', 'success');
+        
+        // 刷新文件列表
+        setTimeout(() => {
+            updateSdcardPage();
+        }, 1000);
+    } catch (error) {
+        showFileActionMessage(error.message, 'error');
+    }
+}
+
+// 初始化文件操作模态框
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('downloadBtn').addEventListener('click', function() {
+        downloadFile();
+    });
+    
+    document.getElementById('deleteBtn').addEventListener('click', function() {
+        document.getElementById('deleteConfirm').style.display = 'block';
+    });
+
+    document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+        deleteFile();
+    });
+
+    document.getElementById('cancelDeleteBtn').addEventListener('click', function() {
+        document.getElementById('deleteConfirm').style.display = 'none';
+    });
+
+    document.getElementById('returnBtn').addEventListener('click', function() {
+        document.getElementById('fileModal').style.display = 'none';
+        resetFileModal();
+    });
+
+    document.getElementById('fileModal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            resetFileModal();
+            this.style.display = 'none';
+        }
+    });
+});
 </script>
 </body>
 </html>
