@@ -1,5 +1,6 @@
 #include <cmath>
 #include <utility>
+#include <iostream>
 
 #include "utils/utils.h"
 
@@ -24,6 +25,25 @@ double haversine_distance(double lat1, double lon1, double lat2, double lon2) {
     double c = 2 * std::atan2(std::sqrt(a), std::sqrt(1-a));
 
     return R * c;
+}
+
+double calculate_course(double last_lat, double last_lon, double lat, double lon) {
+    const double deg2rad = M_PI / 180.0;
+
+    double lat1 = last_lat * deg2rad;
+    double lon1 = last_lon * deg2rad;
+    double lat2 = lat * deg2rad;
+    double lon2 = lon * deg2rad;
+
+    double dLon = lon2 - lon1;
+
+    double y = std::sin(dLon) * std::cos(lat2);
+    double x = std::cos(lat1) * std::sin(lat2) - 
+               std::sin(lat1) * std::cos(lat2) * std::cos(dLon);
+    
+    double bearing = std::atan2(y, x);
+    double course = std::fmod((bearing * 180.0 / M_PI + 360.0), 360.0);
+    return course;
 }
 
 void init_gpx(FILE *fp) {

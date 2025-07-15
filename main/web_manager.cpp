@@ -37,7 +37,8 @@ esp_err_t WebManager::trace_full_handler(httpd_req_t *req) {
     nlohmann::json trace_response = {
         {"in_track", context_ptr->enable_track},
         {"distance", context_ptr->trace_state.get_distance()},
-        {"speed", context_ptr->gnss_state.ground_speed}
+        {"speed", context_ptr->gnss_state.ground_speed},
+        {"course", context_ptr->gnss_state.course}
     };
     context_ptr->gnss_state.mutex.unlock_read();
     trace_response["trace"] = context_ptr->trace_state.get_waypoints();
@@ -54,7 +55,8 @@ esp_err_t WebManager::trace_recent_handler(httpd_req_t *req) {
     nlohmann::json trace_response = {
         {"in_track", context_ptr->enable_track},
         {"distance", context_ptr->trace_state.get_distance()},
-        {"speed", context_ptr->gnss_state.ground_speed}
+        {"speed", context_ptr->gnss_state.ground_speed},
+        {"course", context_ptr->gnss_state.course}
     };
     context_ptr->gnss_state.mutex.unlock_read();
     trace_response["trace"] = context_ptr->trace_state.get_last_waypoints();

@@ -79,6 +79,7 @@ public:
     double doppler_speed;
     double ground_speed;
     double rms_deviation;
+    double course;
     int hdop;
     int fix_quality;
     int fix_type;

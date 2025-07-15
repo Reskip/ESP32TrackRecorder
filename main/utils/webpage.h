@@ -444,14 +444,39 @@ function handleLatestLocation(traceArr) {
 
     // 10秒无操作且有新定位点时才自动定位
     if ((Date.now() - lastUserAction) > 10000 && hasNewPosition) {
+        let _lastUserAction = lastUserAction;
         let [lon, lat] = transform.wgs84ToGcj02(latest.lon, latest.lat)
         map.panTo([lat, lon]);
         lastLocatedPoint = latestCoord;
+        lastUserAction = _lastUserAction;
     }
 }
 
 // 地图与轨迹相关
 let lastTraceData = [];
+let positionMarker = null;
+
+function updatePositionMarker(traceArr, course) {
+    if (!traceArr || traceArr.length === 0) return;
+    
+    const latestPoint = traceArr[traceArr.length - 1];
+    const [lon, lat] = transform.wgs84ToGcj02(latestPoint.lon, latestPoint.lat);
+    const point = L.latLng(lat, lon);
+
+    if (!positionMarker) {
+        positionMarker = L.circleMarker(point, {
+            radius: 8,
+            fillColor: "#2196f3",
+            color: "transparent",
+            weight: 0,
+            opacity: 1,
+            fillOpacity: 0.6
+        }).addTo(map);
+    } else {
+        positionMarker.setLatLng(point);
+    }
+}
+
 function initMap() {
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView([39.9042, 116.4074], 13);
     tileGaode = L.tileLayer(gcj02TileUrl, { subdomains: '1234', maxZoom: 18, minZoom: 3, attribution: '© 高德' });
@@ -690,12 +715,35 @@ async function fetchFullTrace() {
         let traceArr = data.trace || data;
         lastTraceData = [...traceArr];
         drawTrack(lastTraceData);
-        handleLatestLocation(lastTraceData); // 定位逻辑
+        handleLatestLocation(lastTraceData);
+        updatePositionMarker(lastTraceData, data.course);
 
         // 更新轨迹状态与长度
         updateTrackInfo(data);
     } catch (error) {
         console.error('Error fetching full trace:', error);
+    }
+}
+
+// 定时获取最新轨迹点
+async function fetchRecentTrace() {
+    try {
+        const response = await fetch('/trace_recent');
+        if (!response.ok) throw new Error('Failed to fetch recent trace');
+        
+        const data = await response.json();
+        let newPoints = data.trace || [];
+
+        if (newPoints.length > 0 && !isSamePoint(newPoints[0], lastTraceData[lastTraceData.length - 1])) {
+            lastTraceData = [...lastTraceData, ...newPoints];
+            drawTrack(lastTraceData);
+            handleLatestLocation(lastTraceData);
+            updatePositionMarker(lastTraceData, data.course);
+        }
+
+        updateTrackInfo(data);
+    } catch (error) {
+        console.error('Error fetching recent trace:', error);
     }
 }
 
@@ -712,29 +760,6 @@ function updateTrackInfo(data) {
     document.getElementById('trackStatus').className = `status ${statusClass}`;
     document.getElementById('trackLength').textContent = lengthTxt;
     document.getElementById('currentSpeed').textContent = speedTxt;
-}
-
-// 定时获取最新轨迹点
-async function fetchRecentTrace() {
-    try {
-        const response = await fetch('/trace_recent');
-        if (!response.ok) throw new Error('Failed to fetch recent trace');
-        
-        const data = await response.json();
-        let newPoints = data.trace || [];
-        
-        // 只添加新的点
-        if (newPoints.length > 0 && !isSamePoint(newPoints[0], lastTraceData[lastTraceData.length - 1])) {
-            lastTraceData = [...lastTraceData, ...newPoints];
-            drawTrack(lastTraceData);
-            handleLatestLocation(lastTraceData);
-        }
-
-        // 更新轨迹状态与长度
-        updateTrackInfo(data);
-    } catch (error) {
-        console.error('Error fetching recent trace:', error);
-    }
 }
 
 // 第一次加载时获取全量轨迹

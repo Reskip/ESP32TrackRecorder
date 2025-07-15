@@ -17,6 +17,7 @@ GNSSState::GNSSState(gpio_num_t tx, gpio_num_t rx)
         doppler_speed(0.0),
         ground_speed(0.0),
         rms_deviation(0.0),
+        course(0.0),
         hdop(0),
         fix_quality(0),
         valid(false),
@@ -276,6 +277,7 @@ bool GNSSState::parse() {
             double ts_now = _hour + (_minute / 60.0) + (_second / 3600.0) + (_microseconds / 3.6e9);
             double ts_diff = ts_now - ts_before;
             double distance = haversine_distance(latitude, longitude, _latitude, _longitude);
+            course = calculate_course(latitude, longitude, _latitude, _longitude);
             point_cache.push_back(std::make_pair(ts_diff, distance));
         } else if (!point_cache.empty()) {
             point_cache.erase(point_cache.begin());
