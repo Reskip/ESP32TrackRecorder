@@ -12,6 +12,7 @@
 #include "utils/json.hpp"
 
 #define WEB_TAG "Web"
+#define COURSE_SPEED_LIMIT 5
 
 class WebManager {
 private:

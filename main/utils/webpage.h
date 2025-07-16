@@ -414,6 +414,12 @@ let lastUserAction = Date.now();
 let lastLocatedPoint = null;
 let lastPositionCoords = null;
 
+let lastTraceData = [];
+let lastCourse = null;
+let positionCircle = null;
+let positionTriangle = null;
+let lastTraceReqTime = Date.now();
+
 // 监听用户地图操作（拖动/缩放等行为）
 function setupMapActionListener() {
     if (!map) return;
@@ -421,6 +427,11 @@ function setupMapActionListener() {
         map.on(ev, function() {
             lastUserAction = Date.now();
         });
+    });
+
+    map.on('zoomend', function() {
+        updatePositionMarker(lastTraceData, lastCourse);
+        console.log("reset");
     });
 }
 
@@ -452,10 +463,6 @@ function handleLatestLocation(traceArr) {
     }
 }
 
-// 地图与轨迹相关
-let lastTraceData = [];
-let positionMarker = null;
-
 function updatePositionMarker(traceArr, course) {
     if (!traceArr || traceArr.length === 0) return;
     
@@ -463,8 +470,8 @@ function updatePositionMarker(traceArr, course) {
     const [lon, lat] = transform.wgs84ToGcj02(latestPoint.lon, latestPoint.lat);
     const point = L.latLng(lat, lon);
 
-    if (!positionMarker) {
-        positionMarker = L.circleMarker(point, {
+    if (!positionCircle) {
+        positionCircle = L.circleMarker(point, {
             radius: 8,
             fillColor: "#2196f3",
             color: "transparent",
@@ -473,7 +480,51 @@ function updatePositionMarker(traceArr, course) {
             fillOpacity: 0.6
         }).addTo(map);
     } else {
-        positionMarker.setLatLng(point);
+        positionCircle.setLatLng(point);
+    }
+
+    if (course !== null) {
+        if (!positionTriangle) {
+            positionTriangle = L.polygon([], {
+                fillColor: "#2196f3",
+                weight: 1.5,
+                opacity: 0.3,
+                fillOpacity: 0.6,
+                lineCap: 'round',
+                lineJoin: 'round',
+                color: '#2196f3'
+            }).addTo(map);
+        }
+        const ang = (course || 0) * Math.PI / 180;
+        const half = Math.PI / 6;
+
+        const center = map.latLngToLayerPoint(point);
+
+        function offset(angle, dist) {
+            return L.point(
+                center.x + dist * Math.sin(angle),
+                center.y - dist * Math.cos(angle)
+            );
+        }
+
+        const apex = offset(ang, 14);
+        const apex_close = offset(ang, 12);
+        const left = offset(ang + half, 12);
+        const right = offset(ang - half, 12);
+
+        positionTriangle.setLatLngs([
+            map.layerPointToLatLng(apex),
+            map.layerPointToLatLng(left),
+            map.layerPointToLatLng(apex_close),
+            map.layerPointToLatLng(right)
+        ]);
+        if (!map.hasLayer(positionTriangle)) {
+            positionTriangle.addTo(map);
+        }
+    } else {
+        if (positionTriangle && map.hasLayer(positionTriangle)) {
+            map.removeLayer(positionTriangle);
+        }
     }
 }
 
@@ -714,6 +765,7 @@ async function fetchFullTrace() {
         const data = await response.json();
         let traceArr = data.trace || data;
         lastTraceData = [...traceArr];
+        lastCourse = data.course;
         drawTrack(lastTraceData);
         handleLatestLocation(lastTraceData);
         updatePositionMarker(lastTraceData, data.course);
@@ -762,11 +814,19 @@ function updateTrackInfo(data) {
     document.getElementById('currentSpeed').textContent = speedTxt;
 }
 
-// 第一次加载时获取全量轨迹
-fetchFullTrace();
+fetchFullTrace().then(() => { lastTraceReqTime = Date.now(); });
 
-// 之后每隔2秒获取最新轨迹点
-setInterval(fetchRecentTrace, 2000);
+async function autoFetchTrace() {
+    let now = Date.now();
+    if (now - lastTraceReqTime > 5000) {
+        await fetchFullTrace();
+    } else {
+        await fetchRecentTrace();
+    }
+    lastTraceReqTime = Date.now();
+}
+
+setInterval(autoFetchTrace, 1100);
 
 // ------ 卫星信息相关 ------
 async function fetchSatellites() {
