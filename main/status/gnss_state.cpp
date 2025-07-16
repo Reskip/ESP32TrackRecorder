@@ -6,6 +6,7 @@
 
 #include "status/gnss_state.h"
 #include "utils/utils.h"
+#include "context.h"
 
 GNSSState::GNSSState(gpio_num_t tx, gpio_num_t rx)
     :
@@ -319,6 +320,10 @@ bool GNSSState::parse() {
     if (update_gga || update_gsv || update_gsa) {
         satellites = std::move(satellites_copy);
     }
+
+    if (update_rmc || update_gga || update_gst || update_gsa) {
+        this->context->status_updated = true;
+    }
     mutex.unlock_write();
     return true;
 }
@@ -356,4 +361,8 @@ bool GNSSState::wait_for_ack(uint8_t class_id, uint8_t msg_id) {
 
     ESP_LOGE(GNSS_TAG, "Timeout waiting for UBX ACK");
     return false;
+}
+
+void GNSSState::register_context(Context* context) {
+    this->context = context;
 }

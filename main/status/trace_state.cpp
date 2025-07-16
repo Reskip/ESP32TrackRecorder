@@ -5,6 +5,7 @@
 
 #include "status/trace_state.h"
 #include "utils/utils.h"
+#include "context.h"
 
 #define SAMPLE_RATE 10
 #define SAVE_FILE_RATE 30
@@ -133,6 +134,7 @@ void Trace::add_waypoint(GNSSState &gnss_state) {
         current_trace.push_back(point_json);
     }
     sample_cnt += 1;
+    context->status_updated = true;
 
     mutex.unlock_write();
 }
@@ -150,4 +152,8 @@ int Trace::get_duration_ms() {
         return 0;
     }
     return (esp_timer_get_time() / 1000) - local_start_time_ms;
+}
+
+void Trace::register_context(Context* context) {
+    this->context = context;
 }

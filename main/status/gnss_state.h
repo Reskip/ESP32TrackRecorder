@@ -32,6 +32,8 @@ const std::vector<std::vector<uint8_t>> ubx_conf_command = {
     {0xB5, 0x62, 0x06, 0x8A, 0x21, 0x00, 0x00, 0x04, 0x00, 0x00, 0x21, 0x00, 0x11, 0x20, 0x00, 0x07, 0x00, 0x93, 0x20, 0x01, 0x01, 0x00, 0x93, 0x20, 0x28, 0x01, 0x00, 0x21, 0x30, 0xF4, 0x01, 0x01, 0x00, 0x52, 0x40, 0x00, 0xC2, 0x01, 0x00, 0x3B, 0xF4}
 };
 
+struct Context;
+
 struct Satellite {
 public:
     Satellite()
@@ -69,6 +71,7 @@ public:
     bool init();
     bool send_ubx_command(const uint8_t* command, size_t length);
     bool wait_for_ack(uint8_t class_id, uint8_t msg_id);
+    void register_context(Context* context);
 
     gpio_num_t gpio_tx;
     gpio_num_t gpio_rx;
@@ -92,6 +95,8 @@ public:
     std::string timestamp;
     std::vector<Satellite> satellites;
     std::vector<std::pair<double, double>> point_cache;
+
+    Context* context;
 };
 
 #endif

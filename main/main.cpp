@@ -29,6 +29,7 @@
 #include "status/trace_state.h"
 
 #include "utils/json.hpp"
+#include "utils/utils.h"
 
 #define MAIN_TAG "Main"
 #define CONFIG_FILE "CONFIG.TXT"
@@ -65,34 +66,6 @@ void load_config(Context &context) {
     context.timezone = config.value("timezone", 8);
     context.wifi_ssid = config.value("wifi_ssid", "");
     context.wifi_passwd = config.value("wifi_passwd", "");
-}
-
-void monitorSystemResources(Context &context) {
-    UBaseType_t stack_high_watermark = uxTaskGetStackHighWaterMark(NULL);
-    ESP_LOGI(MAIN_TAG, "Task Stack High Water Mark: %d bytes (minimum remaining stack)", stack_high_watermark);
-
-    size_t free_heap = heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    size_t total_heap = heap_caps_get_total_size(MALLOC_CAP_8BIT);
-    size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-
-    ESP_LOGI(MAIN_TAG, "Heap Memory: Free=%d bytes, Total=%d bytes, Largest Block=%d bytes",
-             free_heap, total_heap, largest_block);
-
-    uint64_t total_bytes, free_bytes;
-    esp_err_t err = esp_vfs_fat_info(MOUNT_POINT, &total_bytes, &free_bytes);
-    if (err == ESP_OK) {
-        ESP_LOGI(MAIN_TAG, "Total size: %llu bytes", total_bytes);
-        ESP_LOGI(MAIN_TAG, "Free space: %llu bytes", free_bytes);
-    } else {
-        ESP_LOGE(MAIN_TAG, "Failed to get file system info: %s", esp_err_to_name(err));
-    }
-
-    while (xSemaphoreTake(context.storage_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
-    context.ram_total = total_heap;
-    context.ram_used = total_heap - free_heap;
-    context.flash_total = total_bytes;
-    context.flash_used = total_bytes - free_bytes;
-    xSemaphoreGive(context.storage_mutex);
 }
 
 void mount_sdcard_spi() {

@@ -12,6 +12,8 @@
 
 #define TRACE_TAG "TraceState"
 
+struct Context;
+
 struct WayPoint {
     double latitude;
     double longitude;
@@ -82,6 +84,7 @@ public:
 
     void try_close_trace();
     int get_duration_ms();
+    void register_context(Context* context);
 
     RWlock mutex;
 private:
@@ -95,5 +98,6 @@ private:
     int sample_cnt;
     bool closed;
     FILE *fp;
+    Context* context;
 };
 #endif

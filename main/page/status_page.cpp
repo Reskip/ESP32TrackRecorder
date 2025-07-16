@@ -27,7 +27,7 @@ void StatusPage::render_expand(Context &context, OLED &oled) {
         battery = 100.0;
     }
 
-    while (xSemaphoreTake(context.storage_mutex, pdMS_TO_TICKS(5)) != pdTRUE) {}
+    xSemaphoreTake(context.storage_mutex, portMAX_DELAY);
     double flash_use_rate = (context.flash_used * 100.0) / context.flash_total;
     double ram_use_rate = (context.ram_used * 100.0) / context.ram_total;
     xSemaphoreGive(context.storage_mutex);

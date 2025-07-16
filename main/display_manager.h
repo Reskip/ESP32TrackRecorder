@@ -9,6 +9,8 @@
 #include "page/sidebar_page.h"
 
 #define THOUSAND 1000.0
+#define MIN_REFRESH_FRAME 10
+#define SKIP_FRAME_TIME_MS 20
 #define DISPLAY_TAG "Display"
 
 class DisplayManager {

@@ -43,6 +43,7 @@ bool SidebarPage::handle_scroll(Context& context, OLED &oled, int value) {
 void SidebarPage::set_init_position(int index, int item_num) {
     sidebar_progress = 1.0;
     expand_progress = 1.0;
+    select_progress = 1.0;
     sidebar_current_position = index_to_position(index, item_num);
     sidebar_target_position = index_to_position(index, item_num);
     expand_current_position = SIDEBAR_ICON_X_START;
@@ -116,4 +117,11 @@ void SidebarPage::smooth_easing_move(double &current, double target, double &pro
     }
     double eased_progress = ease_out_quad(progress);
     current = current + (target - current) * eased_progress;
+}
+
+bool SidebarPage::is_animating() {
+    return sidebar_progress < 1.0
+        || expand_progress < 1.0
+        || (!buttons.empty() && select_progress < 1.0)
+        || animation_frame < ANIMATION_FRAME_CNT;
 }

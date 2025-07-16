@@ -30,7 +30,7 @@ SettingPage::SettingPage()
     Button return_btn(Button::ICON_ONLY, "RETURN", 78, Y_MARGIN + 0);
     return_btn.configure_icon((char*) return_icon, 7, 7, false);
     return_btn.set_callback([](Button* btn, Context* context) {
-        context->statue_change_flag = true;
+        context->return_page_flag = true;
     });
 
     buttons.push_back(light_btn);
@@ -71,8 +71,8 @@ bool SettingPage::handle_press(Context& context, OLED &oled) {
     }
     buttons[context.select_btn_id].handle_press(context);
     select_new_btn(context.select_btn_id, oled, true);
-    if (context.statue_change_flag) {
-        context.statue_change_flag = false;
+    if (context.return_page_flag) {
+        context.return_page_flag = false;
         switch_state();
     }
     return true;

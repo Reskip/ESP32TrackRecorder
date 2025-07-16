@@ -461,7 +461,6 @@ void OLED::draw_rectangle(int8_t x, int8_t y, uint8_t w, uint8_t h,
 
 void OLED::fill_rectangle(int8_t x, int8_t y, uint8_t w, uint8_t h,
 		ssd1306_color_t color) {
-	// Can be optimized?
 	uint8_t i;
 	for (i = x; i < x + w; ++i)
 		draw_vline(i, y, h, color);

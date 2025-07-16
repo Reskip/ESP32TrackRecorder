@@ -34,11 +34,15 @@ struct Context {
         flash_used(0),
         ram_total(0),
         ram_used(0),
-        statue_change_flag(false),
+        return_page_flag(false),
         brightness_change_flag(false),
+        status_updated(true),
         timezone(0),
         wifi_ssid(""),
         wifi_passwd("") {
+            battery_state.register_context(this);
+            gnss_state.register_context(this);
+            trace_state.register_context(this);
         }
     GNSSState& gnss_state;
     Battery& battery_state;
@@ -65,8 +69,9 @@ struct Context {
     int64_t ram_total;
     int64_t ram_used;
 
-    bool statue_change_flag;
+    bool return_page_flag;
     bool brightness_change_flag;
+    bool status_updated;
 
     int timezone;
     std::string wifi_ssid;

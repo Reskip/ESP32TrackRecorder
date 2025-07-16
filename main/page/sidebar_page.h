@@ -2,12 +2,14 @@
 #ifndef SIDEBAR_PAGE_H
 #define SIDEBAR_PAGE_H
 
-#include "page.h"
 #include "esp_system.h"
 #include <vector>
 #include <string>
 #include <algorithm>
 #include <cmath>
+
+#include "page.h"
+#include "button.h"
 
 #define SCROLL_SPEED 50.0
 #define HIDE_SCROLL_SPEED 1.0
@@ -37,9 +39,10 @@ public:
     double get_sidebar_start_pos_x();
     void smooth_easing_move(double &current, double target, double &progress, double speed, bool update_progress=true);
     double lock_fps_speed(Context &context, double speed);
+    bool is_animating() override;
     void debug();
 
-private:
+protected:
     virtual void render_expand(Context &context, OLED &oled) = 0;
     void render_icon(Context &context, OLED &oled);
     double index_to_position(int index, int item_num);
@@ -54,6 +57,11 @@ private:
     double expand_progress;
 
     double animation_frame;
+
+    std::vector<Button> buttons;
+    double select_x, select_y, select_w, select_h;
+    double target_select_x, target_select_y, target_select_w, target_select_h;
+    double select_progress;
 
     char* sidebar_icon;
 };

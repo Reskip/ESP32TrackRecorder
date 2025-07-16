@@ -1,6 +1,7 @@
 #include "battery_state.h"
 #include "driver/i2c.h"
 #include "esp_log.h"
+#include "context.h"
 
 #define I2C_MASTER_FREQ_HZ 400000  // I2C 频率
 #define I2C_MASTER_TIMEOUT_MS 1000
@@ -59,6 +60,8 @@ void Battery::update_all_status() {
         request_cache_cnt += 1;
         return;
     }
+
+    context->status_updated = true;
     request_cache_cnt = 0;
     uint16_t raw_value;
 
@@ -119,4 +122,8 @@ void Battery::print_debug_info() {
     float soc_ = read_soc();
     int charging_ = is_charging();
     ESP_LOGI(BATTERY_TAG, "Voltage: %.3f V, SOC: %.1f%%, Charging: %d", voltage_, soc_, charging_);
+}
+
+void Battery::register_context(Context* context) {
+    this->context = context;
 }

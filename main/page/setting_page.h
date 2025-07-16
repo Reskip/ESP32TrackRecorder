@@ -2,7 +2,6 @@
 #include <string>
 
 #include "sidebar_page.h"
-#include "button.h"
 
 #ifndef SETTING_PAGE
 #define SETTING_PAGE
@@ -20,10 +19,6 @@ public:
 private:
     void render_expand(Context &context, OLED &oled) override;
     void select_new_btn(int btn_id, OLED &oled, bool immidiate=false);
-    std::vector<Button> buttons;
-    double select_x, select_y, select_w, select_h;
-    double target_select_x, target_select_y, target_select_w, target_select_h;
-    double select_progress;
 };
 
 #endif

@@ -9,6 +9,8 @@
 #define BATTERY_TAG "BatteryState"
 #define REQUEST_CACHE 100
 
+struct Context;
+
 class Battery {
 public:
     Battery(gpio_num_t scl, gpio_num_t sda, gpio_num_t charging);
@@ -21,11 +23,14 @@ public:
     bool is_charging();
     bool read_register(uint8_t reg, uint16_t *value) const;
     void update_all_status();
+    void register_context(Context* context);
 
     gpio_num_t scl, sda, charging;
     float voltage_, soc_;
     int charging_;
     int request_cache_cnt;
+
+    Context* context;
 };
 
 #endif

@@ -47,6 +47,9 @@ void DisplayManager::updateDisplay(Context &context) {
     context.fresh_cnt += 1;
     context.fresh_ts_diff_ms = esp_timer_get_time() / THOUSAND - context.last_fresh_ts_ms;
     context.last_fresh_ts_ms = esp_timer_get_time() / THOUSAND;
+    if (context.fresh_cnt % MIN_REFRESH_FRAME == 0) {
+        context.status_updated = true;
+    }
     if (context.last_fresh_ts_ms - context.last_fps_update_ts_ms > THOUSAND) {
         context.fps = context.fresh_cnt * THOUSAND / (context.last_fresh_ts_ms - context.last_fps_update_ts_ms);
         context.fresh_cnt = 0;
@@ -65,6 +68,7 @@ void DisplayManager::updateDisplay(Context &context) {
         if (!event.position) {
             continue;
         }
+        context.status_updated = true;
         if (side_pages[context.select_page_id]->handle_press(context, oled)) {
             continue;
         }
@@ -73,6 +77,7 @@ void DisplayManager::updateDisplay(Context &context) {
     }
 
     while (xQueueReceive(context.encoder_state.encoder_queue, &event, 0)){
+        context.status_updated = true;
         if (side_pages[context.select_page_id]->handle_scroll(context, oled, event.position)) {
             continue;
         }
@@ -89,16 +94,24 @@ void DisplayManager::updateDisplay(Context &context) {
                     (i - context.select_page_id + 2 + side_pages.size()) % side_pages.size(),
                     side_pages.size()
                 );
-                // ESP_LOGI(DISPLAY_TAG, "Encoder Event page mapping %d %d",
-                //     i, (i - context.select_page_id + 2 + side_pages.size()) % side_pages.size()
-                // );
             }
         }
         ESP_LOGI(DISPLAY_TAG, "Encoder Event: %d, select page: %d", event.position, context.select_page_id);
     }
 
+    bool animating = context.status_updated;
+    for (int i = 0; i < side_pages.size(); i++) {
+        animating = animating || side_pages[i]->is_animating();
+    }
+
+    if (!animating) {
+        vTaskDelay(pdMS_TO_TICKS(20));
+        return;
+    }
+
     oled.clear();
     context.gnss_state.mutex.lock_read();
+    context.status_updated = false;
     main_page->render(context, oled);
     for (int i = 0; i < side_pages.size(); i++) {
         side_pages[i]->render(context, oled);

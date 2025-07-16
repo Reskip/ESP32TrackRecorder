@@ -212,6 +212,7 @@ void WebManager::event_handler(void* arg, esp_event_base_t event_base,
     WebManager* web_manager = static_cast<WebManager*>(arg);
     Context *context_ptr = static_cast<Context*>(web_manager->context_ptr);
     
+    context_ptr->status_updated = true;
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
