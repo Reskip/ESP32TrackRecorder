@@ -112,7 +112,7 @@ const char *html = R"(
             margin: 10px 0;
         }
         .sidebar-toggle-btn:hover, .sdcard-btn:hover, .locate-btn:hover {
-            transform: scale(1.08);
+            transform: scale(1.0);
         }
         .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); z-index: 40; }
         .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); z-index: 41; }
@@ -120,7 +120,7 @@ const char *html = R"(
         /* SD卡文件列表样式 */
         .sdcard-file-list {
             background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001;
-            padding: 16px 12px 12px 12px; margin: 16px; max-height: 60vh; min-height: 80px; overflow-y: auto; font-size: 14px;
+            padding: 16px 12px 12px 12px; margin: 16px; max-height: 90vh; min-height: 80px; overflow-y: auto; font-size: 14px;
         }
         .sdcard-file-list table { width: 100%; border-collapse: collapse; }
         .sdcard-file-list th, .sdcard-file-list td { padding: 4px 6px; text-align: left; white-space: nowrap; }
@@ -224,6 +224,7 @@ const char *html = R"(
             overflow: hidden;
             text-overflow: ellipsis;
             vertical-align: middle;
+            text-align: center;
         }
         .file-item:hover {
             background-color: #e0e0e0;
@@ -292,6 +293,22 @@ const char *html = R"(
         }
         .return-btn:hover {
             background-color: #5a6268;
+        }
+        .current-file {
+            padding: 8px 12px;
+            margin: 2px 0;
+            background-color: #e8f5e9;
+            border-color: #e8f5e9;
+            color: #2e7d32;
+            font-weight: bold;
+            border: 1px solid #e8f5e9;
+            border-radius: 4px;
+            text-align: center;
+            cursor: default !important;
+        }
+        .current-file:hover {
+            background-color: #e8f5e9 !important;
+            border-color: #e8f5e9 !important;
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -472,7 +489,7 @@ function updatePositionMarker(traceArr, course) {
 
     if (!positionCircle) {
         positionCircle = L.circleMarker(point, {
-            radius: 8,
+            radius: 10,
             fillColor: "#2196f3",
             color: "transparent",
             weight: 0,
@@ -507,10 +524,10 @@ function updatePositionMarker(traceArr, course) {
             );
         }
 
-        const apex = offset(ang, 14);
-        const apex_close = offset(ang, 12);
-        const left = offset(ang + half, 12);
-        const right = offset(ang - half, 12);
+        const apex = offset(ang, 16);
+        const apex_close = offset(ang, 14);
+        const left = offset(ang + half, 14);
+        const right = offset(ang - half, 14);
 
         positionTriangle.setLatLngs([
             map.layerPointToLatLng(apex),
@@ -614,6 +631,10 @@ function updateSdcardPage() {
             
             const data = await response.json();
             let files = data.files || [];
+            let currentFile = data.current_file || '';
+            files.sort((a, b) => {
+                return b.name.localeCompare(a.name);
+            });
             let html = `<div style="font-weight:bold; font-size:16px; margin-bottom:10px;">SD卡文件</div>`;
             
             if (!files.length) {
@@ -625,14 +646,26 @@ function updateSdcardPage() {
                     if (size > 1e6) size = (size/1e6).toFixed(1) + ' MB';
                     else if (size > 1e3) size = (size/1e3).toFixed(1) + ' KB';
                     else size = size + ' B';
-                    html += `<tr>
-                        <td>
-                            <button type="button" class="file-item" data-file="${f.name}" title="${f.name}">
-                                ${f.name}
-                            </button>
-                        </td>
-                        <td>${size}</td>
-                    </tr>`;
+                    const isCurrentFile = currentFile.includes(f.name);
+                    if (isCurrentFile) {
+                        html += `<tr>
+                            <td>
+                                <div class="current-file" title="${f.name}">
+                                    ${f.name}
+                                </div>
+                            </td>
+                            <td>${size}</td>
+                        </tr>`;
+                    } else {
+                        html += `<tr>
+                            <td>
+                                <button type="button" class="file-item" data-file="${f.name}" title="${f.name}">
+                                    ${f.name}
+                                </button>
+                            </td>
+                            <td>${size}</td>
+                        </tr>`;
+                    }
                 }
                 html += `</table>`;
             }
@@ -694,7 +727,7 @@ async function openSidebar(contentType) {
     if (contentType === 'sdcard') {
         updateSdcardPage();
     } else {
-        isTransitioning = false; // 非SD卡内容直接完成过渡
+        isTransitioning = false;
     }
     
     sidebar.classList.add('open');
@@ -705,7 +738,6 @@ async function openSidebar(contentType) {
 toggleBtn.onclick = () => openSidebar('satellite');
 sdcardBtn.onclick = () => openSidebar('sdcard');
 
-// 当侧边栏关闭时，恢复内容
 sidebar.addEventListener('transitionend', function() {
     if (!sidebar.classList.contains('open') && !isTransitioning) {
         sdcardFileList.style.display = 'none';
@@ -715,7 +747,6 @@ sidebar.addEventListener('transitionend', function() {
     }
 });
 
-// ========== 右下角定位按钮功能 ==========
 document.getElementById('locateBtn').onclick = function() {
     if (lastTraceData && lastTraceData.length) {
         let latest = lastTraceData[lastTraceData.length - 1];
@@ -725,7 +756,6 @@ document.getElementById('locateBtn').onclick = function() {
     }
 };
 
-// 轨迹显示
 function drawTrack(traceArr) {
     if (!traceArr || traceArr.length === 0) { 
         if (currentTrack) { 
@@ -749,14 +779,12 @@ function drawTrack(traceArr) {
     currentTrack = L.polyline(points, { color: '#2196f3', weight: 4, opacity: 0.8 }).addTo(trackLayer);
 }
 
-// 检查两个点是否相同
 function isSamePoint(p1, p2) {
     return p1 && p2 && 
            p1.lat === p2.lat && 
            p1.lon === p2.lon;
 }
 
-// 第一次加载时获取全量轨迹
 async function fetchFullTrace() {
     try {
         const response = await fetch('/trace_full');
@@ -770,14 +798,12 @@ async function fetchFullTrace() {
         handleLatestLocation(lastTraceData);
         updatePositionMarker(lastTraceData, data.course);
 
-        // 更新轨迹状态与长度
         updateTrackInfo(data);
     } catch (error) {
         console.error('Error fetching full trace:', error);
     }
 }
 
-// 定时获取最新轨迹点
 async function fetchRecentTrace() {
     try {
         const response = await fetch('/trace_recent');

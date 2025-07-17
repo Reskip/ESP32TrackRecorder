@@ -84,6 +84,7 @@ public:
 
     void try_close_trace();
     int get_duration_ms();
+    std::string get_file_name();
     void register_context(Context* context);
 
     RWlock mutex;

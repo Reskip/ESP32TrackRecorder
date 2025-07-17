@@ -8,7 +8,7 @@
 #define ENCODERSTATE
 
 #define ENCODER_TAG "EncoderState"
-#define DEBOUNCE_TIME_MS 80
+#define DEBOUNCE_TIME_MS 50
 
 typedef struct {
     int position;

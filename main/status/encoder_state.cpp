@@ -93,6 +93,7 @@ void IRAM_ATTR Encoder::encoder_isr_scroll_handler(void *arg) {
             return;
         }
         encoder->last_press_key = event.position;
+        encoder->last_interrupt_time = current_time;
         xQueueSendFromISR(encoder->encoder_queue, &event, NULL);
     }
 }

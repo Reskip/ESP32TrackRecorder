@@ -144,6 +144,7 @@ void Trace::try_close_trace() {
         return;
     }
     closed = true;
+    file_name = "";
     close_gpx(fp);
 }
 
@@ -152,6 +153,10 @@ int Trace::get_duration_ms() {
         return 0;
     }
     return (esp_timer_get_time() / 1000) - local_start_time_ms;
+}
+
+std::string Trace::get_file_name() {
+    return file_name;
 }
 
 void Trace::register_context(Context* context) {

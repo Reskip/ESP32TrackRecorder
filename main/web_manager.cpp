@@ -96,8 +96,10 @@ esp_err_t WebManager::satellites_get_handler(httpd_req_t *req) {
 }
 
 esp_err_t WebManager::sdcard_files_handler(httpd_req_t *req) {
+    Context *context_ptr = (Context*) req->user_ctx;
     nlohmann::json jresp;
     jresp["files"] = nlohmann::json::array();
+    jresp["current_file"] = context_ptr->trace_state.get_file_name();
 
     std::string sd_path = MOUNT_POINT;
 
@@ -274,7 +276,7 @@ void WebManager::register_uri_handlers() {
         .uri       = "/sdcard_files",
         .method    = HTTP_GET,
         .handler   = sdcard_files_handler,
-        .user_ctx  = NULL
+        .user_ctx  = context_ptr
     };
     httpd_register_uri_handler(server, &sdcard_files_uri);
 
