@@ -7,6 +7,7 @@
 #define CONTEXT
 
 #define MOUNT_POINT "/spiflash"
+#define CONFIG_FILE "CONFIG.TXT"
 
 struct Context {
     Context(
@@ -39,7 +40,9 @@ struct Context {
         status_updated(true),
         timezone(0),
         wifi_ssid(""),
-        wifi_passwd("") {
+        wifi_passwd(""),
+        assist_now_token(""),
+        assist_in_progress(false) {
             battery_state.register_context(this);
             gnss_state.register_context(this);
             trace_state.register_context(this);
@@ -76,6 +79,8 @@ struct Context {
     int timezone;
     std::string wifi_ssid;
     std::string wifi_passwd;
+    std::string assist_now_token;
+    bool assist_in_progress;
 
     SemaphoreHandle_t storage_mutex = xSemaphoreCreateMutex();;
 };

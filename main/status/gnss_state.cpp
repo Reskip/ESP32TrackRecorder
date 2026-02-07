@@ -35,14 +35,14 @@ GNSSState::GNSSState(gpio_num_t tx, gpio_num_t rx)
 
 GNSSState::~GNSSState() {}
 
-bool GNSSState::init() {
+bool GNSSState::init(const std::function<void(int, int)> &progress_callback) {
     uart_config_t uart_config = {
-        .baud_rate = BAUD_RATE,                // 波特率
-        .data_bits = UART_DATA_8_BITS,      // 数据位
-        .parity = UART_PARITY_DISABLE,      // 无校验位
-        .stop_bits = UART_STOP_BITS_1,      // 停止位
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, // 无硬件流控
-        .source_clk = UART_SCLK_APB,        // 使用 APB 时钟
+        .baud_rate = BAUD_RATE,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_APB,
     };
 
     uart_param_config(UART_NUM, &uart_config);
@@ -51,15 +51,64 @@ bool GNSSState::init() {
 
     ESP_LOGI(GNSS_TAG, "GNSS UART initialized on TX=%d, RX=%d", gpio_tx, gpio_rx);
 
-    for (const std::vector<uint8_t> &conf: ubx_conf_command) {
-        uint8_t cmd_buff[128];
-        std::copy(conf.begin(), conf.end(), cmd_buff);
-        do {
-            send_ubx_command(cmd_buff, conf.size());
-        } while (!wait_for_ack(conf[2], conf[3]));
+    int detected_baud_rate = detect_baud_rate(progress_callback);
+    if (detected_baud_rate < 0) {
+        ESP_LOGE(GNSS_TAG, "Failed to configure GNSS baud rate");
+        return false;
     }
 
+    ESP_LOGI(GNSS_TAG, "GNSS config ACK received at baud rate: %d", detected_baud_rate);
+
+    if (uart_set_baudrate(UART_NUM, BAUD_RATE) != ESP_OK) {
+        ESP_LOGE(GNSS_TAG, "Failed to switch UART back to %d", BAUD_RATE);
+        return false;
+    }
+
+    uart_flush_input(UART_NUM);
+    ESP_LOGI(GNSS_TAG, "GNSS UART switched to %d", BAUD_RATE);
+
     return true;
+}
+
+int GNSSState::detect_baud_rate(const std::function<void(int, int)> &progress_callback) {
+    static constexpr std::array<int, 5> kCandidateBaudRates = {9600, 38400, 57600, 115200, 230400};
+    const int total_steps = kCandidateBaudRates.size();
+    int current_step = 0;
+    progress_callback(current_step, total_steps);
+
+    for (int baud_rate : kCandidateBaudRates) {
+        if (uart_set_baudrate(UART_NUM, baud_rate) != ESP_OK) {
+            ESP_LOGW(GNSS_TAG, "Failed to set baud rate to %d while probing", baud_rate);
+            continue;
+        }
+
+        uart_flush_input(UART_NUM);
+        vTaskDelay(pdMS_TO_TICKS(50));
+        current_step += 1;
+        progress_callback(current_step, total_steps);
+
+        bool all_conf_acked = true;
+        for (const std::vector<uint8_t> &conf: ubx_conf_command) {
+            uint8_t cmd_buff[128];
+            std::copy(conf.begin(), conf.end(), cmd_buff);
+            
+            send_ubx_command(cmd_buff, conf.size());
+            bool conf_acked = wait_for_ack(conf[2], conf[3]);
+            ESP_LOGI(GNSS_TAG, "GNSS UART baud rate test %d, result: %s",
+                baud_rate, conf_acked ? "yes" : "no");
+
+            if (!conf_acked) {
+                all_conf_acked = false;
+                break;
+            }
+        }
+
+        if (all_conf_acked) {
+            return baud_rate;
+        }
+    }
+
+    return 115200;
 }
 
 void GNSSState::print_debug_info() const {
@@ -328,6 +377,22 @@ bool GNSSState::parse() {
     return true;
 }
 
+bool GNSSState::send_assist_data(const uint8_t* assist_data, size_t length) {
+    if (assist_data == nullptr || length == 0) {
+        ESP_LOGE(GNSS_TAG, "AssistNow data is empty");
+        return false;
+    }
+
+    int bytes_written = uart_write_bytes(UART_NUM, assist_data, length);
+    if (bytes_written < 0 || static_cast<size_t>(bytes_written) != length) {
+        ESP_LOGE(GNSS_TAG, "Failed to send AssistNow data: %d/%d", bytes_written, static_cast<int>(length));
+        return false;
+    }
+
+    ESP_LOGI(GNSS_TAG, "AssistNow data sent, length: %d", bytes_written);
+    return true;
+}
+
 bool GNSSState::send_ubx_command(const uint8_t* command, size_t length) {
     int bytes_written = uart_write_bytes(UART_NUM, command, length);
     if (bytes_written < 0) {
@@ -343,7 +408,7 @@ bool GNSSState::wait_for_ack(uint8_t class_id, uint8_t msg_id) {
 
     while (ack_round--) {
         uint8_t buffer[128];
-        int len = uart_read_bytes(UART_NUM, buffer, sizeof(buffer)-10, 50);
+        int len = uart_read_bytes(UART_NUM, buffer, sizeof(buffer)-10, 20);
 
         for (int i = 0; i < len; i++) {
             if (buffer[i] == UBX_SYNC_CHAR_1 && buffer[i+1] == UBX_SYNC_CHAR_2 && buffer[i+2] == UBX_ACK) {

@@ -19,6 +19,7 @@
 #include "sdmmc_cmd.h"
 
 #include "minmea.h"
+#include "context.h"
 #include "page/page.h"
 #include "display_manager.h"
 #include "web_manager.h"
@@ -32,7 +33,6 @@
 #include "utils/utils.h"
 
 #define MAIN_TAG "Main"
-#define CONFIG_FILE "CONFIG.TXT"
 
 void load_config(Context &context) {
     using json = nlohmann::json;
@@ -42,7 +42,8 @@ void load_config(Context &context) {
         const json config = {
             {"timezone", 8},
             {"wifi_ssid", ""},
-            {"wifi_passwd", ""}
+            {"wifi_passwd", ""},
+            {"assist_now_token", ""}
         };
         
         std::ofstream(conf_file_path) << config.dump(4);
@@ -66,6 +67,7 @@ void load_config(Context &context) {
     context.timezone = config.value("timezone", 8);
     context.wifi_ssid = config.value("wifi_ssid", "");
     context.wifi_passwd = config.value("wifi_passwd", "");
+    context.assist_now_token = config.value("assist_now_token", "6W0vwYNERN2jcR4jDuqR-w");
 }
 
 void mount_sdcard_spi() {
@@ -133,7 +135,16 @@ extern "C" void app_main() {
     gpio_set_level(GPIO_NUM_4, 1);
     gpio_install_isr_service(0);
     encoder_state.init();
-    gnss_state.init();
+
+    if (!display_manager.init()) {
+        ESP_LOGE(MAIN_TAG, "Failed to initialize OLED");
+        return;
+    }
+
+    display_manager.showGnssBootScreen(1, 0);
+    gnss_state.init([](int completed_steps, int total_steps) {
+        display_manager.showGnssBootScreen(total_steps, completed_steps);
+    });
 
     xTaskCreate([](void* param) {
         while (true) {
@@ -148,11 +159,6 @@ extern "C" void app_main() {
             vTaskDelay(pdMS_TO_TICKS(200));
         }
     }, "UpdateGNSSState", 4096, NULL, 1, NULL);
-
-    if (!display_manager.init()) {
-        ESP_LOGE(MAIN_TAG, "Failed to initialize OLED");
-        return;
-    }
 
     while (1) {
         encoder_state.encoder_press_handler();

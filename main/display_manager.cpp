@@ -43,6 +43,29 @@ bool DisplayManager::init() {
     return true;
 }
 
+void DisplayManager::showGnssBootScreen(int configured_steps, int completed_steps) {
+    const int bar_x = 12;
+    const int bar_y = 22;
+    const int bar_w = 104;
+    const int bar_h = 8;
+
+    const int fill_w = completed_steps * (bar_w - 2) / configured_steps;
+
+    oled.clear();
+    oled.draw_string(12, 0, "ESP32 Track", WHITE, BLACK);
+    oled.draw_string(12, 10, "GNSS Init ...", WHITE, BLACK);
+    oled.draw_rectangle(bar_x, bar_y, bar_w, bar_h, WHITE);
+    if (fill_w > 0) {
+        oled.fill_rectangle(bar_x + 1, bar_y + 1, fill_w, bar_h - 2, WHITE);
+    }
+
+    std::ostringstream progress_stream;
+    progress_stream << completed_steps << "/" << configured_steps;
+    oled.draw_string(92, 0, progress_stream.str().c_str(), WHITE, BLACK);
+
+    oled.refresh(true);
+}
+
 void DisplayManager::updateDisplay(Context &context) {
     context.fresh_cnt += 1;
     context.fresh_ts_diff_ms = esp_timer_get_time() / THOUSAND - context.last_fresh_ts_ms;

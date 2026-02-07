@@ -20,6 +20,7 @@ public:
 
     bool init();
     void updateDisplay(Context &context);
+    void showGnssBootScreen(int configured_steps, int completed_steps);
 
 private:
     OLED oled;

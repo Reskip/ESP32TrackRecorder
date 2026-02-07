@@ -92,7 +92,7 @@ const char *html = R"(
         .tile-switcher { top: 18px; z-index: 20; background: #fff; border-radius: 18px; box-shadow: 0 2px 6px #0002; padding: 4px 10px; }
         .tile-switcher button { background: none; border: none; font-size: 15px; color: #333; margin-right: 10px; cursor: pointer; }
         .tile-switcher .active { color: #ff9800; font-weight: bold; }
-        .sidebar-toggle-btn, .sdcard-btn, .locate-btn {
+        .sidebar-toggle-btn, .sdcard-btn, .assist-btn, .locate-btn {
             position: absolute; 
             right: 18px;
             background: #ff9800; 
@@ -111,11 +111,12 @@ const char *html = R"(
             touch-action: manipulation;
             margin: 10px 0;
         }
-        .sidebar-toggle-btn:hover, .sdcard-btn:hover, .locate-btn:hover {
+        .sidebar-toggle-btn:hover, .sdcard-btn:hover, .assist-btn:hover, .locate-btn:hover {
             transform: scale(1.0);
         }
         .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); z-index: 40; }
         .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); z-index: 41; }
+        .assist-btn { top: calc(env(safe-area-inset-top, 28px) + 104px); z-index: 41; }
         .locate-btn { bottom: env(safe-area-inset-bottom, 34px); z-index: 41; }
         /* SD卡文件列表样式 */
         .sdcard-file-list {
@@ -143,6 +144,7 @@ const char *html = R"(
             .tile-switcher { left: 18px !important; top: env(safe-area-inset-top, 28px); }
             .sidebar-toggle-btn { top: env(safe-area-inset-top, 28px); }
             .sdcard-btn { top: calc(env(safe-area-inset-top, 28px) + 52px); }
+            .assist-btn { top: calc(env(safe-area-inset-top, 28px) + 104px); }
             .locate-btn { bottom: env(safe-area-inset-bottom, 34px); }
         }
         /* 文件操作模态框样式 */
@@ -310,6 +312,35 @@ const char *html = R"(
             background-color: #e8f5e9 !important;
             border-color: #e8f5e9 !important;
         }
+
+        .assist-panel {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px #0001;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .assist-panel label { font-size: 13px; color: #666; }
+        .assist-panel input {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 8px;
+            font-size: 14px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .assist-apply-btn {
+            border: none;
+            border-radius: 6px;
+            background: #ff9800;
+            color: #fff;
+            padding: 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .assist-status { font-size: 13px; color: #555; min-height: 20px; }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -326,6 +357,7 @@ const char *html = R"(
     </div>
     <button class="sidebar-toggle-btn" id="sidebarToggle" title="卫星信息">&#9776;</button>
     <button class="sdcard-btn" id="sdcardBtn" title="SD卡文件">&#128190;</button>
+    <button class="assist-btn" id="assistBtn" title="辅助定位">&#128752;</button>
     <button class="locate-btn" id="locateBtn" title="定位">&#128204;</button>
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header"></div>
@@ -341,8 +373,21 @@ const char *html = R"(
                 <div class="spinner"></div>
             </div>
         </div>
+        <div class="sdcard-file-list" id="assistNowPanel" style="display:none;">
+            <div class="assist-panel">
+                <div style="font-weight:bold; font-size:16px;">AssistNow 辅助定位</div>
+                <label>当前预估纬度</label>
+                <input id="assistLat" type="text" placeholder="例如: 39.9042" />
+                <label>当前预估经度</label>
+                <input id="assistLon" type="text" placeholder="例如: 116.4074" />
+                <label>AssistNow Service Key</label>
+                <input id="assistToken" type="text" placeholder="请输入 token" />
+                <button class="assist-apply-btn" id="assistApplyBtn">开启辅助定位</button>
+                <div class="assist-status" id="assistStatus"></div>
+            </div>
+        </div>
     </div>
-    
+
     <!-- 文件操作模态框 -->
     <div id="fileModal" class="modal">
         <div class="modal-content">
@@ -592,7 +637,7 @@ document.getElementById('btn-osm').onclick = () => switchTile(false);
 
 // 侧边栏状态管理
 let sidebarOpen = false;
-let currentSidebarContent = null; // 'satellite' 或 'sdcard'
+let currentSidebarContent = null; // 'satellite' | 'sdcard' | 'assist'
 let isTransitioning = false; // 过渡状态标志
 let isLoadingFiles = false; // 文件加载状态标志
 
@@ -600,8 +645,10 @@ let isLoadingFiles = false; // 文件加载状态标志
 const sidebar = document.getElementById('sidebar');
 const toggleBtn = document.getElementById('sidebarToggle');
 const sdcardBtn = document.getElementById('sdcardBtn');
+const assistBtn = document.getElementById('assistBtn');
 const sidebarSection = document.querySelector('.sidebar-section');
 const sdcardFileList = document.getElementById('sdcardFileList');
+const assistNowPanel = document.getElementById('assistNowPanel');
 
 // 等待侧边栏动画完成的Promise
 function waitForTransition(element) {
@@ -708,6 +755,7 @@ async function openSidebar(contentType) {
         await waitForTransition(sidebar);
         sidebarSection.style.display = '';
         sdcardFileList.style.display = 'none';
+        assistNowPanel.style.display = 'none';
         currentSidebarContent = null;
         sidebarOpen = false;
         isTransitioning = false;
@@ -723,9 +771,13 @@ async function openSidebar(contentType) {
     // 切换内容
     sidebarSection.style.display = contentType === 'satellite' ? '' : 'none';
     sdcardFileList.style.display = contentType === 'sdcard' ? '' : 'none';
+    assistNowPanel.style.display = contentType === 'assist' ? '' : 'none';
 
     if (contentType === 'sdcard') {
         updateSdcardPage();
+    } else if (contentType === 'assist') {
+        loadAssistNowInfo();
+        isTransitioning = false;
     } else {
         isTransitioning = false;
     }
@@ -737,15 +789,105 @@ async function openSidebar(contentType) {
 
 toggleBtn.onclick = () => openSidebar('satellite');
 sdcardBtn.onclick = () => openSidebar('sdcard');
+assistBtn.onclick = () => openSidebar('assist');
 
 sidebar.addEventListener('transitionend', function() {
     if (!sidebar.classList.contains('open') && !isTransitioning) {
         sdcardFileList.style.display = 'none';
+        assistNowPanel.style.display = 'none';
         sidebarSection.style.display = '';
         currentSidebarContent = null;
         sidebarOpen = false;
     }
 });
+
+async function fetchIpEstimatedLocation() {
+    const providers = [
+        async () => {
+            const resp = await fetch('https://ipwho.is/');
+            if (!resp.ok) throw new Error('ipwho.is unavailable');
+            const data = await resp.json();
+            if (!data.success) throw new Error('ipwho.is failed');
+            return { lat: Number(data.latitude), lon: Number(data.longitude), source: 'ipwho.is' };
+        },
+        async () => {
+            const resp = await fetch('https://ipapi.co/json/');
+            if (!resp.ok) throw new Error('ipapi.co unavailable');
+            const data = await resp.json();
+            return { lat: Number(data.latitude), lon: Number(data.longitude), source: 'ipapi.co' };
+        }
+    ];
+
+    for (const provider of providers) {
+        try {
+            const location = await provider();
+            if (!Number.isNaN(location.lat) && !Number.isNaN(location.lon)) {
+                return location;
+            }
+        } catch (_) {
+        }
+    }
+
+    throw new Error('all ip geolocation providers failed');
+}
+
+async function loadAssistNowInfo() {
+    const statusEl = document.getElementById('assistStatus');
+    statusEl.textContent = '正在加载 AssistNow 信息...';
+    const latInput = document.getElementById('assistLat');
+    const lonInput = document.getElementById('assistLon');
+    const tokenInput = document.getElementById('assistToken');
+
+    try {
+        const infoResp = await fetch('/assist_now_info');
+        const info = infoResp.ok ? await infoResp.json() : {};
+        tokenInput.value = info.token || '';
+
+        const location = await fetchIpEstimatedLocation();
+        latInput.value = location.lat.toFixed(6);
+        lonInput.value = location.lon.toFixed(6);
+        statusEl.textContent = `已根据 IP 预估位置（${location.source}），可手动修改后开启辅助定位`;
+    } catch (e) {
+        statusEl.textContent = 'IP 位置预估失败，请手动填写经纬度与 token';
+    }
+}
+
+async function applyAssistNow() {
+    const lat = Number(document.getElementById('assistLat').value);
+    const lon = Number(document.getElementById('assistLon').value);
+    const token = document.getElementById('assistToken').value.trim();
+    const statusEl = document.getElementById('assistStatus');
+    const btn = document.getElementById('assistApplyBtn');
+
+    if (Number.isNaN(lat) || Number.isNaN(lon)) {
+        statusEl.textContent = '经纬度格式错误';
+        return;
+    }
+    if (!token) {
+        statusEl.textContent = '请填写 service key';
+        return;
+    }
+
+    btn.disabled = true;
+    statusEl.textContent = '正在请求 u-blox AssistNow 并下发到芯片...';
+    try {
+        const resp = await fetch('/assist_now_apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lon, token })
+        });
+        if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(text || 'AssistNow 请求失败');
+        }
+        const data = await resp.json();
+        statusEl.textContent = `辅助定位已开启，写入 ${data.bytes || 0} 字节`;
+    } catch (e) {
+        statusEl.textContent = `辅助定位失败：${e.message}`;
+    } finally {
+        btn.disabled = false;
+    }
+}
 
 document.getElementById('locateBtn').onclick = function() {
     if (lastTraceData && lastTraceData.length) {
@@ -1055,6 +1197,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('returnBtn').addEventListener('click', function() {
         document.getElementById('fileModal').style.display = 'none';
         resetFileModal();
+    });
+
+    document.getElementById('assistApplyBtn').addEventListener('click', function() {
+        applyAssistNow();
     });
 
     document.getElementById('fileModal').addEventListener('click', function(event) {

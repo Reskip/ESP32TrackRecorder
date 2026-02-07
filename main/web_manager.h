@@ -5,11 +5,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_http_server.h"
+#include "esp_http_client.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "lwip/ip4_addr.h"
 #include "utils/json.hpp"
+
+struct Context;
 
 #define WEB_TAG "Web"
 #define COURSE_SPEED_LIMIT 5
@@ -17,6 +20,7 @@
 class WebManager {
 private:
     httpd_handle_t server = NULL;
+
     void* context_ptr;
     
     static void event_handler(void* arg, esp_event_base_t event_base,
@@ -29,6 +33,10 @@ private:
     static esp_err_t sdcard_files_handler(httpd_req_t *req);
     static esp_err_t download_file_handler(httpd_req_t *req);
     static esp_err_t delete_file_handler(httpd_req_t *req);
+    static esp_err_t assist_now_info_handler(httpd_req_t *req);
+    static esp_err_t assist_now_apply_handler(httpd_req_t *req);
+
+    static bool update_assist_token(Context* context_ptr, const std::string& token);
 
     void register_uri_handlers();
     esp_err_t start_webserver();
