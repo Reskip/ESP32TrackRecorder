@@ -380,6 +380,11 @@ const char *html = R"(
                 <input id="assistLat" type="text" placeholder="例如: 39.9042" />
                 <label>当前预估经度</label>
                 <input id="assistLon" type="text" placeholder="例如: 116.4074" />
+                <label>AssistNow 模式</label>
+                <select id="assistMode">
+                    <option value="live" selected>Live（原 Online）</option>
+                    <option value="predictive_orbits">Predictive Orbits（原 Offline）</option>
+                </select>
                 <label>AssistNow Service Key</label>
                 <input id="assistToken" type="text" placeholder="请输入 token" />
                 <button class="assist-apply-btn" id="assistApplyBtn">开启辅助定位</button>
@@ -856,6 +861,7 @@ async function applyAssistNow() {
     const lat = Number(document.getElementById('assistLat').value);
     const lon = Number(document.getElementById('assistLon').value);
     const token = document.getElementById('assistToken').value.trim();
+    const mode = document.getElementById('assistMode').value;
     const statusEl = document.getElementById('assistStatus');
     const btn = document.getElementById('assistApplyBtn');
 
@@ -869,12 +875,12 @@ async function applyAssistNow() {
     }
 
     btn.disabled = true;
-    statusEl.textContent = '正在请求 u-blox AssistNow 并下发到芯片...';
+    statusEl.textContent = `正在请求 u-blox AssistNow（${mode === 'predictive_orbits' ? 'Predictive Orbits' : 'Live'}）并下发到芯片...`;
     try {
         const resp = await fetch('/assist_now_apply', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lat, lon, token })
+            body: JSON.stringify({ lat, lon, token, mode })
         });
         if (!resp.ok) {
             const text = await resp.text();

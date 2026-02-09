@@ -309,6 +309,7 @@ esp_err_t WebManager::assist_now_apply_handler(httpd_req_t *req) {
     }
 
     const std::string token = request_json.value("token", "");
+    const std::string mode = request_json.value("mode", "live");
     const double lat = request_json.value("lat", 0.0);
     const double lon = request_json.value("lon", 0.0);
     if (token.empty()) {
@@ -324,9 +325,15 @@ esp_err_t WebManager::assist_now_apply_handler(httpd_req_t *req) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "No memory for AssistNow URL");
         return ESP_FAIL;
     }
-    snprintf(url.get(), 512,
-        "https://online-live1.services.u-blox.com/GetOnlineData.ashx?token=%s&gnss=gps,glo,bds,gal&datatype=eph,aux,pos&pacc=0&alt=0&lat=%.2f&lon=%.2f",
-        urlEncode(token).c_str(), lat, lon);
+    if (mode == "predictive_orbits") {
+        snprintf(url.get(), 512,
+            "https://offline-live1.services.u-blox.com/GetOfflineData.ashx?token=%s;gnss=gps,glo,bds,gal;format=mga;period=5;resolution=1",
+            urlEncode(token).c_str());
+    } else {
+        snprintf(url.get(), 512,
+            "https://online-live1.services.u-blox.com/GetOnlineData.ashx?token=%s&gnss=gps,glo,bds,gal&datatype=eph,aux,pos&pacc=0&alt=0&lat=%.2f&lon=%.2f",
+            urlEncode(token).c_str(), lat, lon);
+    }
 
     auto config = std::make_unique<esp_http_client_config_t>();
     if (!config) {
