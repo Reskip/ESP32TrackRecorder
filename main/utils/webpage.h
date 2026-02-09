@@ -481,19 +481,39 @@ let lastCourse = null;
 let positionCircle = null;
 let positionTriangle = null;
 let lastTraceReqTime = Date.now();
+let isMapInteracting = false;
+let pendingUiRefresh = false;
+let pendingTrackInfo = null;
 
 // 监听用户地图操作（拖动/缩放等行为）
+function applyPendingTraceRefresh() {
+    if (!pendingUiRefresh) return false;
+    drawTrack(lastTraceData);
+    updatePositionMarker(lastTraceData, lastCourse);
+    if (pendingTrackInfo) {
+        updateTrackInfo(pendingTrackInfo);
+        pendingTrackInfo = null;
+    }
+    pendingUiRefresh = false;
+    return true;
+}
+
 function setupMapActionListener() {
     if (!map) return;
     ['movestart', 'zoomstart', 'dragstart'].forEach(ev => {
         map.on(ev, function() {
             lastUserAction = Date.now();
+            isMapInteracting = true;
         });
     });
-
-    map.on('zoomend', function() {
-        updatePositionMarker(lastTraceData, lastCourse);
-        console.log("reset");
+    ['zoomend', 'moveend', 'dragend'].forEach(ev => {
+        map.on(ev, function() {
+            isMapInteracting = false;
+            const refreshed = applyPendingTraceRefresh();
+            if (!refreshed) {
+                updatePositionMarker(lastTraceData, lastCourse);
+            }
+        });
     });
 }
 
@@ -591,7 +611,14 @@ function updatePositionMarker(traceArr, course) {
 }
 
 function initMap() {
-    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([39.9042, 116.4074], 13);
+    map = L.map('map', {
+        zoomControl: false,
+        attributionControl: false,
+        doubleClickZoom: true,
+        tap: true,
+        tapTolerance: 15,
+        preferCanvas: true
+    }).setView([39.9042, 116.4074], 13);
     tileGaode = L.tileLayer(gcj02TileUrl, { subdomains: '1234', maxZoom: 18, minZoom: 3, attribution: '© 高德' });
     tileOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OSM' });
     tileGaode.addTo(map);
@@ -918,7 +945,7 @@ function drawTrack(traceArr) {
     });
     
     if (currentTrack) trackLayer.removeLayer(currentTrack);
-    currentTrack = L.polyline(points, { color: '#2196f3', weight: 4, opacity: 0.8 }).addTo(trackLayer);
+    currentTrack = L.polyline(points, { color: '#2196f3', weight: 4, opacity: 0.8, renderer: L.canvas() }).addTo(trackLayer);
 }
 
 function isSamePoint(p1, p2) {
@@ -936,6 +963,13 @@ async function fetchFullTrace() {
         let traceArr = data.trace || data;
         lastTraceData = [...traceArr];
         lastCourse = data.course;
+
+        if (isMapInteracting) {
+            pendingUiRefresh = true;
+            pendingTrackInfo = data;
+            return;
+        }
+
         drawTrack(lastTraceData);
         handleLatestLocation(lastTraceData);
         updatePositionMarker(lastTraceData, data.course);
@@ -956,9 +990,23 @@ async function fetchRecentTrace() {
 
         if (newPoints.length > 0 && !isSamePoint(newPoints[0], lastTraceData[lastTraceData.length - 1])) {
             lastTraceData = [...lastTraceData, ...newPoints];
+            lastCourse = data.course;
+
+            if (isMapInteracting) {
+                pendingUiRefresh = true;
+                pendingTrackInfo = data;
+                return;
+            }
+
             drawTrack(lastTraceData);
             handleLatestLocation(lastTraceData);
             updatePositionMarker(lastTraceData, data.course);
+        }
+
+        if (isMapInteracting) {
+            pendingTrackInfo = data;
+            pendingUiRefresh = true;
+            return;
         }
 
         updateTrackInfo(data);
@@ -1147,10 +1195,23 @@ function downloadFile() {
     currentFileName = document.getElementById('modalFileName').textContent;
     showFileActionMessage('准备下载文件...', 'loading');
     
-    setTimeout(() => {
-        window.location.href = `/download?file=${encodeURIComponent(currentFileName)}`;
+    const downloadUrl = `/download?file=${encodeURIComponent(currentFileName)}`;
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = currentFileName;
+    anchor.rel = 'noopener';
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+
+    try {
+        anchor.click();
         showFileActionMessage('已开始下载文件', 'success');
-    }, 500);
+    } catch (error) {
+        window.location.assign(downloadUrl);
+        showFileActionMessage('已开始下载文件', 'success');
+    } finally {
+        document.body.removeChild(anchor);
+    }
 }
 
 async function deleteFile() {

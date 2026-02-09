@@ -193,11 +193,12 @@ esp_err_t WebManager::download_file_handler(httpd_req_t *req) {
     size_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    char content_disposition[256];
-    snprintf(content_disposition, sizeof(content_disposition), 
-            "attachment; filename=\"%s\"", file_name.c_str());
+    char content_disposition[320];
+    snprintf(content_disposition, sizeof(content_disposition),
+            "attachment; filename=\"%s\"; filename*=UTF-8''%s",
+            file_name.c_str(), file_name.c_str());
 
-    httpd_resp_set_type(req, "text/plain");
+    httpd_resp_set_type(req, "application/gpx+xml; charset=utf-8");
     httpd_resp_set_hdr(req, "Content-Disposition", content_disposition);
     httpd_resp_set_hdr(req, "Content-Length", std::to_string(file_size).c_str());
     httpd_resp_set_hdr(req, "Cache-Control", "no-cache, no-store, must-revalidate");

@@ -7,7 +7,7 @@
 #define BATTERYSTATE
 
 #define BATTERY_TAG "BatteryState"
-#define REQUEST_CACHE 100
+#define REQUEST_CACHE 20
 
 struct Context;
 
